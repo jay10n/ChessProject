@@ -1,4 +1,10 @@
 #
+# Title: Chess Project
+# About:
+# Author: Jayton Schmeeckle
+#         jvschmeeckle@gmail.com
+# Date:
+#
 import pygame as p
 from Chess import Classes
 

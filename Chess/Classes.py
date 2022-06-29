@@ -1,4 +1,5 @@
 #
+# Classes needed for chess game.
 #
 from enum import Enum
 
@@ -9,6 +10,10 @@ fileToColumn = {"a": 0, "b": 1, "c": 2, "d": 3, "e": 4, "f": 5, "g": 6, "h": 7}
 columnToFile = {v: k for k, v in fileToColumn.items()}
 
 
+#
+# @param (row, column)
+# @returns rank + file as string
+#
 def get_rank_file(row, column):
     return columnToFile[column] + rowToRank[row]
 
@@ -109,11 +114,11 @@ class Move:
 
 class GameState:
     def __init__(self):
-        # Create game state
+        # Create game state, board, players
         self.board = [[Square(0, 0, None, None) for _ in range(0, 8)] for _ in range(0, 8)]
         player1_white = Player(Color.White)
         player2_black = Player(Color.Black)
-        temp_color = Color.Black
+        temp_color = Color.Black  # Used for populating board with pieces.
 
         for column in range(0, 8):
             if column > 2:
@@ -172,25 +177,25 @@ class GameState:
 
     def get_possible_moves(self):
         moves = []
-        for r in range(len(self.board)):
-            for c in range(len(self.board[r])):
-                square = self.board[r][c]
+        for row in range(len(self.board)):
+            for column in range(len(self.board[row])):
+                square = self.board[row][column]
                 if square.piece:
                     if (square.piece.color == Color.White and self.currentTurn == Color.White) or \
                             (square.piece.color == Color.Black and self.currentTurn == Color.Black):
                         match square.piece:
                             case King():
-                                self.get_king_moves(r, c, moves)
+                                self.get_king_moves(row, column, moves)
                             case Queen():
-                                self.get_queen_moves(r, c, moves)
+                                self.get_queen_moves(row, column, moves)
                             case Rook():
-                                self.get_rook_moves(r, c, moves)
+                                self.get_rook_moves(row, column, moves)
                             case Bishop():
-                                self.get_bishop_moves(r, c, moves)
+                                self.get_bishop_moves(row, column, moves)
                             case Knight():
-                                self.get_knight_moves(r, c, moves)
+                                self.get_knight_moves(row, column, moves)
                             case Pawn():
-                                self.get_pawn_moves(r, c, moves)
+                                self.get_pawn_moves(row, column, moves)
         return moves
 
     def get_king_moves(self, r, c, moves):
@@ -198,6 +203,10 @@ class GameState:
         self.move_down(r, c, 1, moves)
         self.move_left(r, c, 1, moves)
         self.move_right(r, c, 1, moves)
+        self.move_down_left(r, c, 1, moves)
+        self.move_down_right(r, c, 1, moves)
+        self.move_up_left(r, c, 1, moves)
+        self.move_up_right(r, c, 1, moves)
 
     def get_queen_moves(self, r, c, moves):
         self.get_rook_moves(r, c, moves)
@@ -258,7 +267,26 @@ class GameState:
                     break
 
     def get_knight_moves(self, r, c, moves):
-        pass
+        values1 = [1, -1]
+        values2 = [2, -2]
+
+        for val2 in values2:
+            if r + val2 in range(8):
+                for val1 in values1:
+                    if c + val1 in range(8):
+                        if self.board[r + val2][c + val1].piece is None:
+                            moves.append(Move((r, c), (r + val2, c + val1), self.board))
+                        elif self.board[r + val2][c + val1].piece.color != self.board[r][c].piece.color:
+                            moves.append(Move((r, c), (r + val2, c + val1), self.board))
+
+        for val1 in values1:
+            if r + val1 in range(8):
+                for val2 in values2:
+                    if c + val2 in range(8):
+                        if self.board[r + val1][c + val2].piece is None:
+                            moves.append(Move((r, c), (r + val1, c + val2), self.board))
+                        elif self.board[r + val1][c + val2].piece.color != self.board[r][c].piece.color:
+                            moves.append(Move((r, c), (r + val1, c + val2), self.board))
 
     def get_pawn_moves(self, r, c, moves):
         if self.currentTurn == Color.White:
