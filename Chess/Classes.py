@@ -169,20 +169,24 @@ class GameState:
             self.board[move.endRow][move.endColumn].piece = move.pieceCaptured
             self.toggle_turn()
 
-    def is_in_check(self):
-        pass
+    def is_in_check(self, valid_moves):
+        for move in valid_moves:
+            if move.pieceCaptured:
+                match move.pieceCaptured:
+                    case King():
+                        return True
 
-    def get_valid_moves(self):
-        return self.get_possible_moves()
+    def get_valid_moves(self, player):
+        return self.get_possible_moves(player)
 
-    def get_possible_moves(self):
+    def get_possible_moves(self, player):
         moves = []
         for row in range(len(self.board)):
             for column in range(len(self.board[row])):
                 square = self.board[row][column]
                 if square.piece:
-                    if (square.piece.color == Color.White and self.currentTurn == Color.White) or \
-                            (square.piece.color == Color.Black and self.currentTurn == Color.Black):
+                    if (square.piece.color == Color.White and player == Color.White) or \
+                            (square.piece.color == Color.Black and player == Color.Black):
                         match square.piece:
                             case King():
                                 self.get_king_moves(row, column, moves)
@@ -289,7 +293,7 @@ class GameState:
                             moves.append(Move((r, c), (r + val1, c + val2), self.board))
 
     def get_pawn_moves(self, r, c, moves):
-        if self.currentTurn == Color.White:
+        if self.board[r][c].piece.color == Color.White:
             if self.board[r - 1][c].piece is None:  # Up 1
                 moves.append(Move((r, c), (r - 1, c), self.board))
                 if r == 6 and self.board[r - 2][c].piece is None:  # Up 2
@@ -301,7 +305,7 @@ class GameState:
                 if self.board[r - 1][c + 1].piece and self.board[r - 1][c + 1].piece.color == Color.Black:
                     moves.append(Move((r, c), (r - 1, c + 1), self.board))
 
-        if self.currentTurn == Color.Black:
+        if self.board[r][c].piece.color == Color.Black:
             if self.board[r + 1][c].piece is None:  # Down 1
                 moves.append(Move((r, c), (r + 1, c), self.board))
                 if r == 1 and self.board[r + 2][c].piece is None:  # Down 2
