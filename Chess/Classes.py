@@ -28,12 +28,12 @@ class Player:
         self.color = color
         self.piece_list = []
         self.material = 0
+        self.is_in_check = False
 
 
 class Piece:
-    def __init__(self, square, color):
+    def __init__(self, color):
         self.color = color
-        self.square = square
         if self.color == Color.White:
             self.nameAbv = "w"
         else:
@@ -41,43 +41,43 @@ class Piece:
 
 
 class Pawn(Piece):
-    def __init__(self, square, color):
-        super().__init__(square, color)
+    def __init__(self, color):
+        super().__init__(color)
         self.materialValue = 1
         self.nameAbv = self.nameAbv + "p"
 
 
 class King(Piece):
-    def __init__(self, square, color):
-        super().__init__(square, color)
+    def __init__(self, color):
+        super().__init__(color)
         self.materialValue = 0
         self.nameAbv = self.nameAbv + "K"
 
 
 class Queen(Piece):
-    def __init__(self, square, color):
-        super().__init__(square, color)
+    def __init__(self, color):
+        super().__init__(color)
         self.materialValue = 9
         self.nameAbv = self.nameAbv + "Q"
 
 
 class Rook(Piece):
-    def __init__(self, square, color):
-        super().__init__(square, color)
+    def __init__(self, color):
+        super().__init__(color)
         self.materialValue = 5
         self.nameAbv = self.nameAbv + "R"
 
 
 class Bishop(Piece):
-    def __init__(self, square, color):
-        super().__init__(square, color)
+    def __init__(self, color):
+        super().__init__(color)
         self.materialValue = 3
         self.nameAbv = self.nameAbv + "B"
 
 
 class Knight(Piece):
-    def __init__(self, square, color):
-        super().__init__(square, color)
+    def __init__(self, color):
+        super().__init__(color)
         self.materialValue = 3
         self.nameAbv = self.nameAbv + "N"
 
@@ -113,11 +113,15 @@ class Move:
 
 
 class GameState:
+    # Create game state, board, players
     def __init__(self):
-        # Create game state, board, players
         self.board = [[Square(0, 0, None, None) for _ in range(0, 8)] for _ in range(0, 8)]
-        player1_white = Player(Color.White)
-        player2_black = Player(Color.Black)
+        self.player_white = Player(Color.White)
+        self.player_black = Player(Color.Black)
+        self.player_to_move = self.player_white
+        self.player_waiting = self.player_black
+        self.moveLog = []
+
         temp_color = Color.Black  # Used for populating board with pieces.
 
         for column in range(0, 8):
@@ -131,30 +135,29 @@ class GameState:
                     case 0 | 7:
                         match row:
                             case 0 | 7:
-                                temp_piece = Rook(temp_square, temp_color)
+                                temp_piece = Rook(temp_color)
                             case 1 | 6:
-                                temp_piece = Knight(temp_square, temp_color)
+                                temp_piece = Knight(temp_color)
                             case 2 | 5:
-                                temp_piece = Bishop(temp_square, temp_color)
+                                temp_piece = Bishop(temp_color)
                             case 3:
-                                temp_piece = Queen(temp_square, temp_color)
+                                temp_piece = Queen(temp_color)
                             case 4:
-                                temp_piece = King(temp_square, temp_color)
+                                temp_piece = King(temp_color)
                     case 1 | 6:
-                        temp_piece = Pawn(temp_square, temp_color)
+                        temp_piece = Pawn(temp_color)
 
                 if temp_piece:
                     self.board[column][row].piece = temp_piece
                     if temp_color == Color.Black:
-                        player2_black.piece_list.append(temp_piece)
+                        self.player_black.piece_list.append(temp_piece)
                     else:
-                        player1_white.piece_list.append(temp_piece)
-
-        self.currentTurn = Color.White
-        self.moveLog = []
+                        self.player_white.piece_list.append(temp_piece)
 
     def toggle_turn(self):
-        self.currentTurn = Color(not self.currentTurn.value)
+        temp_player = self.player_to_move
+        self.player_to_move = self.player_waiting
+        self.player_waiting = temp_player
 
     def make_move(self, move):
         self.board[move.endRow][move.endColumn].piece = move.pieceMoved
@@ -169,7 +172,8 @@ class GameState:
             self.board[move.endRow][move.endColumn].piece = move.pieceCaptured
             self.toggle_turn()
 
-    def is_in_check(self, valid_moves):
+    def is_in_check(self, player):
+        valid_moves = self.get_valid_moves(player)
         for move in valid_moves:
             if move.pieceCaptured:
                 match move.pieceCaptured:
@@ -185,8 +189,8 @@ class GameState:
             for column in range(len(self.board[row])):
                 square = self.board[row][column]
                 if square.piece:
-                    if (square.piece.color == Color.White and player == Color.White) or \
-                            (square.piece.color == Color.Black and player == Color.Black):
+                    if (square.piece.color == Color.White and player == self.player_white) or \
+                            (square.piece.color == Color.Black and player == self.player_black):
                         match square.piece:
                             case King():
                                 self.get_king_moves(row, column, moves)

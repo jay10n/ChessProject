@@ -27,14 +27,14 @@ def main():
     clock = p.time.Clock()
     screen.fill(p.Color("white"))
     gs = Classes.GameState()
-    valid_moves = gs.get_valid_moves(gs.currentTurn)
-    is_in_check = False
+    valid_moves = gs.get_valid_moves(gs.player_to_move)
     move_made = False  # flag to check valid moves
     load_images()
     running = True
     selected_square = ()
     player_clicks = []
-    print("\n------ " + gs.currentTurn.name + "'s Turn! ------\n")
+
+    print("\n\n\n------ " + gs.player_to_move.color.name + "'s Turn! ------\n")
 
     while running:
         for e in p.event.get():
@@ -61,26 +61,27 @@ def main():
                     selected_square = ()
                     player_clicks = []
 
-                    # Key Handlers
-                if gs.is_in_check(gs.get_valid_moves(gs.currentTurn)):
+
+                if gs.is_in_check(gs.player_to_move):
                     print("Can not move into Check!")
                     gs.undo_move()
                 elif move_made:
-                    print("\n------ " + gs.currentTurn.name + "'s Turn! ------\n")
+                    print("\n\n\n------ " + gs.player_to_move.color.name + "'s Turn! ------\n")
                     match move.pieceMoved:
                         case Classes.Pawn():
                             if move.endRow == 0 or move.endRow == 7:
-                                gs.board[move.endRow][move.endColumn].piece = Classes.Queen(gs.board[move.endRow][move.endColumn], Classes.Color(not gs.currentTurn.value))
+                                gs.board[move.endRow][move.endColumn].piece = Classes.Queen(gs.player_waiting.color)
+
+            # Key Handlers
             elif e.type == p.KEYDOWN:
                 if e.key == p.K_z:
                     gs.undo_move()
                     move_made = True
 
         if move_made:
-            valid_moves = gs.get_valid_moves(gs.currentTurn)
-            is_in_check = gs.is_in_check(gs.get_valid_moves(Classes.Color(not gs.currentTurn.value)))
-            if is_in_check:
-                print(gs.currentTurn.name + " is in Check!")
+            valid_moves = gs.get_valid_moves(gs.player_to_move)
+            if gs.is_in_check(gs.player_waiting):
+                print(gs.player_to_move.color.name + " is in Check!")
             move_made = False
 
         draw_game_state(screen, gs)
