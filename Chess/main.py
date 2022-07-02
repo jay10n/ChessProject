@@ -52,17 +52,19 @@ def main():
                 else:
                     selected_square = (row, column)
                     player_clicks.append(selected_square)
+
                 if len(player_clicks) == 2:
                     move = Classes.Move(player_clicks[0], player_clicks[1], gs.board)
                     if move in valid_moves:
                         gs.make_move(move)
                         # print(move.get_chess_notation())
                         move_made = True
-                    selected_square = ()
-                    player_clicks = []
+                        selected_square = ()
+                        player_clicks = []
+                    else:
+                        player_clicks = [selected_square]
 
-
-                if gs.is_in_check(gs.player_to_move):
+                if gs.made_check(gs.player_to_move):
                     print("Can not move into Check!")
                     gs.undo_move()
                 elif move_made:
@@ -80,7 +82,7 @@ def main():
 
         if move_made:
             valid_moves = gs.get_valid_moves(gs.player_to_move)
-            if gs.is_in_check(gs.player_waiting):
+            if gs.made_check(gs.player_waiting):
                 print(gs.player_to_move.color.name + " is in Check!")
             move_made = False
 

@@ -98,6 +98,8 @@ class Move:
         self.endColumn = end_square[1]
         self.pieceMoved = board[self.startRow][self.startColumn].piece
         self.pieceCaptured = board[self.endRow][self.endColumn].piece
+        self.is_check
+        self.is_checkmate
 
     def get_chess_notation(self):
         return get_rank_file(self.startRow, self.startColumn) + get_rank_file(self.endRow, self.endColumn)
@@ -172,13 +174,17 @@ class GameState:
             self.board[move.endRow][move.endColumn].piece = move.pieceCaptured
             self.toggle_turn()
 
-    def is_in_check(self, player):
+    def made_check(self, player):
         valid_moves = self.get_valid_moves(player)
         for move in valid_moves:
             if move.pieceCaptured:
                 match move.pieceCaptured:
                     case King():
                         return True
+
+    def is_checkmate(self, player):
+
+        pass
 
     def get_valid_moves(self, player):
         return self.get_possible_moves(player)
@@ -277,7 +283,6 @@ class GameState:
     def get_knight_moves(self, r, c, moves):
         values1 = [1, -1]
         values2 = [2, -2]
-
         for val2 in values2:
             if r + val2 in range(8):
                 for val1 in values1:
@@ -321,10 +326,6 @@ class GameState:
                 if self.board[r + 1][c + 1].piece and self.board[r + 1][c + 1].piece.color == Color.White:
                     moves.append(Move((r, c), (r + 1, c + 1), self.board))
 
-    '''
-      Move diagonal board a given distance
-      '''
-
     def move_up_left(self, r, c, distance, moves):
         if r - distance >= 0 and c - distance >= 0:
             if self.board[r - distance][c - distance].piece is None:
@@ -353,20 +354,12 @@ class GameState:
             elif self.board[r + distance][c - distance].piece.color != self.board[r][c].piece.color:
                 moves.append(Move((r, c), (r + distance, c - distance), self.board))
 
-    '''
-    Move up board a given distance
-    '''
-
     def move_up(self, r, c, distance, moves):
         if r - distance >= 0:
             if self.board[r - distance][c].piece is None:
                 moves.append(Move((r, c), (r - distance, c), self.board))
             elif self.board[r - distance][c].piece.color != self.board[r][c].piece.color:
                 moves.append(Move((r, c), (r - distance, c), self.board))
-
-    '''
-    Move down board a given distance
-    '''
 
     def move_down(self, r, c, distance, moves):
         if r + distance <= 7:
@@ -375,20 +368,12 @@ class GameState:
             elif self.board[r + distance][c].piece.color != self.board[r][c].piece.color:
                 moves.append(Move((r, c), (r + distance, c), self.board))
 
-    '''
-    Move left a given distance
-    '''
-
     def move_left(self, r, c, distance, moves):
         if c - distance >= 0:
             if self.board[r][c - distance].piece is None:
                 moves.append(Move((r, c), (r, c - distance), self.board))
             elif self.board[r][c - distance].piece.color != self.board[r][c].piece.color:
                 moves.append(Move((r, c), (r, c - distance), self.board))
-
-    '''
-    Move right a given distance
-    '''
 
     def move_right(self, r, c, distance, moves):
         if c + distance <= 7:
