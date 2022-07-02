@@ -98,8 +98,8 @@ class Move:
         self.endColumn = end_square[1]
         self.pieceMoved = board[self.startRow][self.startColumn].piece
         self.pieceCaptured = board[self.endRow][self.endColumn].piece
-        self.is_check
-        self.is_checkmate
+        #self.is_check
+        #self.is_checkmate
 
     def get_chess_notation(self):
         return get_rank_file(self.startRow, self.startColumn) + get_rank_file(self.endRow, self.endColumn)
@@ -112,7 +112,6 @@ class Move:
                    and self.endRow == other.endRow
         else:
             return False
-
 
 class GameState:
     # Create game state, board, players

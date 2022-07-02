@@ -26,15 +26,16 @@ def main():
     screen = p.display.set_mode((WIDTH, HEIGHT))
     clock = p.time.Clock()
     screen.fill(p.Color("white"))
-    gs = Classes.GameState()
-    valid_moves = gs.get_valid_moves(gs.player_to_move)
+
+    game = Classes.GameState()
+    valid_moves = game.get_valid_moves(game.player_to_move)
     move_made = False  # flag to check valid moves
     load_images()
     running = True
     selected_square = ()
     player_clicks = []
 
-    print("\n\n\n------ " + gs.player_to_move.color.name + "'s Turn! ------\n")
+    print("\n\n\n------ " + game.player_to_move.color.name + "'s Turn! ------\n")
 
     while running:
         for e in p.event.get():
@@ -54,9 +55,9 @@ def main():
                     player_clicks.append(selected_square)
 
                 if len(player_clicks) == 2:
-                    move = Classes.Move(player_clicks[0], player_clicks[1], gs.board)
+                    move = Classes.Move(player_clicks[0], player_clicks[1], game.board)
                     if move in valid_moves:
-                        gs.make_move(move)
+                        game.make_move(move)
                         # print(move.get_chess_notation())
                         move_made = True
                         selected_square = ()
@@ -64,29 +65,29 @@ def main():
                     else:
                         player_clicks = [selected_square]
 
-                if gs.made_check(gs.player_to_move):
+                if game.made_check(game.player_to_move):
                     print("Can not move into Check!")
-                    gs.undo_move()
+                    game.undo_move()
                 elif move_made:
-                    print("\n\n\n------ " + gs.player_to_move.color.name + "'s Turn! ------\n")
+                    print("\n\n\n------ " + game.player_to_move.color.name + "'s Turn! ------\n")
                     match move.pieceMoved:
                         case Classes.Pawn():
                             if move.endRow == 0 or move.endRow == 7:
-                                gs.board[move.endRow][move.endColumn].piece = Classes.Queen(gs.player_waiting.color)
+                                game.board[move.endRow][move.endColumn].piece = Classes.Queen(game.player_waiting.color)
 
             # Key Handlers
             elif e.type == p.KEYDOWN:
                 if e.key == p.K_z:
-                    gs.undo_move()
+                    game.undo_move()
                     move_made = True
 
         if move_made:
-            valid_moves = gs.get_valid_moves(gs.player_to_move)
-            if gs.made_check(gs.player_waiting):
-                print(gs.player_to_move.color.name + " is in Check!")
+            valid_moves = game.get_valid_moves(game.player_to_move)
+            if game.made_check(game.player_waiting):
+                print(game.player_to_move.color.name + " is in Check!")
             move_made = False
 
-        draw_game_state(screen, gs)
+        draw_game_state(screen, game)
         clock.tick(MAX_FPS)
         p.display.flip()
 
