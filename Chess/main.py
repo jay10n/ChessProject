@@ -26,18 +26,20 @@ def main():
     screen = p.display.set_mode((WIDTH, HEIGHT))
     clock = p.time.Clock()
     screen.fill(p.Color("white"))
-
-    game = Classes.GameState()
-    valid_moves = game.get_valid_moves(game.player_to_move)
-    move_made = False  # flag to check valid moves
     load_images()
     running = True
     selected_square = ()
-    player_clicks = []
+    selected_squares = []
 
-    print("\n\n\n------ " + game.player_to_move.color.name + "'s Turn! ------\n")
+    gs = Classes.GameState()
+    valid_moves = gs.get_valid_moves(gs.player_moving)
+    move_made = False  # flag to check valid moves
+    print("\n------ " + gs.player_moving.color.name + "'s Turn! ------\n")
 
+    # Run the game
     while running:
+
+        #When the player makes an action with mouse or keyboard
         for e in p.event.get():
             if e.type == p.QUIT:
                 running = False
@@ -45,49 +47,55 @@ def main():
             # Mouse Handlers
             elif e.type == p.MOUSEBUTTONDOWN:
                 location = p.mouse.get_pos()  # x,y pos. mouse
-                column = location[0] // SQ_SIZE
-                row = location[1] // SQ_SIZE
-                if selected_square == (row, column):  # same square selected
-                    selected_square = ()  # reset
-                    player_clicks = []
+                column = location[0] // SQ_SIZE # x pos
+                row = location[1] // SQ_SIZE # y pos
+                if selected_square == (row, column):  # same square selected then reset
+                    selected_square = ()
+                    selected_squares = []
                 else:
                     selected_square = (row, column)
-                    player_clicks.append(selected_square)
+                    selected_squares.append(selected_square)
 
-                if len(player_clicks) == 2:
-                    move = Classes.Move(player_clicks[0], player_clicks[1], game.board)
+                if len(selected_squares) == 2:
+                    move = Classes.Move(selected_squares[0], selected_squares[1], gs.board)
                     if move in valid_moves:
-                        game.make_move(move)
-                        # print(move.get_chess_notation())
-                        move_made = True
-                        selected_square = ()
-                        player_clicks = []
-                    else:
-                        player_clicks = [selected_square]
 
-                if game.made_check(game.player_to_move):
-                    print("Can not move into Check!")
-                    game.undo_move()
-                elif move_made:
-                    print("\n\n\n------ " + game.player_to_move.color.name + "'s Turn! ------\n")
-                    match move.pieceMoved:
-                        case Classes.Pawn():
-                            if move.endRow == 0 or move.endRow == 7:
-                                game.board[move.endRow][move.endColumn].piece = Classes.Queen(game.player_waiting.color)
+                        gs.make_move(valid_moves[valid_moves.index(move)])
+                        if gs.is_in_check(gs.player_moving, gs.player_waiting):
+                            print("You can not move into check! Try again, stupid!\a\n")
+                            gs.undo_move()
+                        else:
+                            print(move.get_chess_notation())
+                            move_made = True
+                            move.pieceMoved.has_moved = True
+                            if Classes.can_promote_pawn(move):
+                                draw_game_state(screen, gs)
+                                clock.tick(MAX_FPS)
+                                p.display.flip()
+                                gs.promote_pawn(gs.player_moving, move)
+                        selected_square = ()
+                        selected_squares = []
+
+                    else:
+                        selected_squares = [selected_square]
 
             # Key Handlers
             elif e.type == p.KEYDOWN:
                 if e.key == p.K_z:
-                    game.undo_move()
+                    gs.undo_move()
+                    gs.toggle_turn()
                     move_made = True
 
         if move_made:
-            valid_moves = game.get_valid_moves(game.player_to_move)
-            if game.made_check(game.player_waiting):
-                print(game.player_to_move.color.name + " is in Check!")
+            gs.toggle_turn()
+            valid_moves = gs.get_valid_moves(gs.player_moving)
+            print("===========================\n")
+            print("------ " + gs.player_moving.color.name + "'s Turn! ------\n")
+            if gs.is_in_check(gs.player_moving, gs.player_waiting):
+                print(gs.player_moving.color.name + " is in Check!")
             move_made = False
 
-        draw_game_state(screen, game)
+        draw_game_state(screen, gs)
         clock.tick(MAX_FPS)
         p.display.flip()
 
@@ -109,8 +117,8 @@ def draw_board(screen):
 def draw_pieces(screen, board):
     for r in range(DIMENSION):
         for c in range(DIMENSION):
-            if board[r][c].piece:
-                screen.blit(IMAGES[board[r][c].piece.nameAbv], p.Rect(c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE))
+            if board.grid[r][c].piece:
+                screen.blit(IMAGES[board.grid[r][c].piece.nameAbv], p.Rect(c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
 
 if __name__ == "__main__":

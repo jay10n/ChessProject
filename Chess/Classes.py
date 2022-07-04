@@ -33,6 +33,7 @@ class Player:
 
 class Piece:
     def __init__(self, color):
+        self.has_moved = False
         self.color = color
         if self.color == Color.White:
             self.nameAbv = "w"
@@ -96,10 +97,10 @@ class Move:
         self.startColumn = start_square[1]
         self.endRow = end_square[0]
         self.endColumn = end_square[1]
-        self.pieceMoved = board[self.startRow][self.startColumn].piece
-        self.pieceCaptured = board[self.endRow][self.endColumn].piece
-        #self.is_check
-        #self.is_checkmate
+        self.pieceMoved = board.grid[self.startRow][self.startColumn].piece
+        self.pieceCaptured = board.grid[self.endRow][self.endColumn].piece
+        # self.is_check
+        # self.is_checkmate
 
     def get_chess_notation(self):
         return get_rank_file(self.startRow, self.startColumn) + get_rank_file(self.endRow, self.endColumn)
@@ -113,28 +114,29 @@ class Move:
         else:
             return False
 
-class GameState:
-    # Create game state, board, players
+
+class Castle(Move):
+    def __init__(self, start_square, end_square, board, rook_start_square, rook_end_square):
+        super().__init__(start_square, end_square, board)
+        self.rook = board.grid[rook_start_square[0]][rook_start_square[1]].piece
+        self.rook_move = Move(rook_start_square, rook_end_square, board)
+
+
+class Board:
     def __init__(self):
-        self.board = [[Square(0, 0, None, None) for _ in range(0, 8)] for _ in range(0, 8)]
-        self.player_white = Player(Color.White)
-        self.player_black = Player(Color.Black)
-        self.player_to_move = self.player_white
-        self.player_waiting = self.player_black
-        self.moveLog = []
+        self.grid = [[Square(0, 0, None, None) for _ in range(0, 8)] for _ in range(0, 8)]
+        temp_color = Color.Black  # Used for populating grid with pieces.
 
-        temp_color = Color.Black  # Used for populating board with pieces.
-
-        for column in range(0, 8):
-            if column > 2:
+        for row in range(0, 8):
+            if row > 2:
                 temp_color = Color.White
-            for row in range(0, 8):
-                temp_square = Square(column, row, Color((column + row) % 2), None)
+            for column in range(0, 8):
+                temp_square = Square(row, column, Color((row + column) % 2), None)
                 temp_piece = None
-                self.board[column][row] = temp_square
-                match column:
+                self.grid[row][column] = temp_square
+                match row:
                     case 0 | 7:
-                        match row:
+                        match column:
                             case 0 | 7:
                                 temp_piece = Rook(temp_color)
                             case 1 | 6:
@@ -148,57 +150,125 @@ class GameState:
                     case 1 | 6:
                         temp_piece = Pawn(temp_color)
 
-                if temp_piece:
-                    self.board[column][row].piece = temp_piece
-                    if temp_color == Color.Black:
-                        self.player_black.piece_list.append(temp_piece)
-                    else:
-                        self.player_white.piece_list.append(temp_piece)
+                self.grid[row][column].piece = temp_piece
+
+
+def can_promote_pawn(move):
+    match move.pieceMoved:
+        case Pawn():
+            if move.endRow == 0 or move.endRow == 7:
+                return True
+    return False
+
+
+class GameState:
+    # Create game state, grid, players
+    def __init__(self):
+        self.player_white = Player(Color.White)
+        self.player_black = Player(Color.Black)
+        self.moveLog = []
+        self.board = Board()
+        self.player_moving = self.player_white
+        self.player_waiting = self.player_black
+        for row in range(8):
+            for column in range(8):
+                match row:
+                    case 0 | 1 | 6 | 7:
+                        match self.board.grid[row][column].piece.color.name:
+                            case Color.White:
+                                self.player_white.piece_list.append(self.board.grid[row][column].piece)
+                                break
+                            case Color.Black:
+                                self.player_black.piece_list.append(self.board.grid[row][column].piece)
+                                break
 
     def toggle_turn(self):
-        temp_player = self.player_to_move
-        self.player_to_move = self.player_waiting
+        temp_player = self.player_moving
+        self.player_moving = self.player_waiting
         self.player_waiting = temp_player
 
     def make_move(self, move):
-        self.board[move.endRow][move.endColumn].piece = move.pieceMoved
-        self.board[move.startRow][move.startColumn].piece = None
+        match move:
+            case Castle():
+                self.make_move(move.rook_move)
+        self.board.grid[move.endRow][move.endColumn].piece = move.pieceMoved
+        self.board.grid[move.startRow][move.startColumn].piece = None
         self.moveLog.append(move)
-        self.toggle_turn()
 
     def undo_move(self):
         if len(self.moveLog) != 0:
             move = self.moveLog.pop()
-            self.board[move.startRow][move.startColumn].piece = move.pieceMoved
-            self.board[move.endRow][move.endColumn].piece = move.pieceCaptured
-            self.toggle_turn()
+            self.board.grid[move.startRow][move.startColumn].piece = move.pieceMoved
+            self.board.grid[move.endRow][move.endColumn].piece = move.pieceCaptured
 
-    def made_check(self, player):
-        valid_moves = self.get_valid_moves(player)
+    def is_in_check(self, player, opponent):
+        valid_moves = self.get_valid_moves(opponent)
         for move in valid_moves:
             if move.pieceCaptured:
                 match move.pieceCaptured:
                     case King():
+                        player.is_in_check = True
                         return True
+        player.is_in_check = False
 
     def is_checkmate(self, player):
-
         pass
+
+    def promote_pawn(self, player, move):
+        new_piece = None
+        user_selection = ' '
+        while new_piece is None:
+            match user_selection:
+                case 'q':
+                    new_piece = Queen(self.player_moving.color)
+                case 'r':
+                    new_piece = Rook(self.player_moving.color)
+                case 'b':
+                    new_piece = Bishop(self.player_moving.color)
+                case 'n':
+                    new_piece = Knight(self.player_moving.color)
+                case _:
+                    user_selection = input("What would you like to promote to? (q, r, b, n) ")
+        self.board.grid[move.endRow][move.endColumn].piece = new_piece
+        player.piece_list.append(new_piece)
 
     def get_valid_moves(self, player):
         return self.get_possible_moves(player)
+        # valid_moves = []
+        # possible_moves = self.get_possible_moves(player)
+        # for move in possible_moves:
 
     def get_possible_moves(self, player):
         moves = []
-        for row in range(len(self.board)):
-            for column in range(len(self.board[row])):
-                square = self.board[row][column]
+        for row in range(8):
+            for column in range(8):
+                square = self.board.grid[row][column]
                 if square.piece:
                     if (square.piece.color == Color.White and player == self.player_white) or \
                             (square.piece.color == Color.Black and player == self.player_black):
                         match square.piece:
                             case King():
                                 self.get_king_moves(row, column, moves)
+                                if not square.piece.has_moved:
+                                    seven_zero = {7, 0}
+                                    player_row = seven_zero[player.color.value]
+                                    rook_locations = {0, 7}
+                                    castle_ranges = {[1, 4],  # queen's side
+                                                     [5, 7]}  # king's side
+                                    for qk_side in range(2):
+                                        temp_rook = self.board.grid[player_row][[rook_locations[qk_side]].piece
+                                        if temp_rook:
+                                            can_castle = True
+                                            if temp_rook.has_moved:
+                                                can_castle = False
+                                            for x in range(castle_ranges[qk_side][0], castle_ranges[qk_side[1]]):
+                                                if self.board.grid[7][x].piece:
+                                                    can_castle = False
+                                            if can_castle:
+                                                moves.append(Castle((seven_zero[player.color.value], 4),
+                                                                    (seven_zero[player.color.value], 2), self.board,
+                                                                    (7, 0), (7, 3)))
+
                             case Queen():
                                 self.get_queen_moves(row, column, moves)
                             case Rook():
@@ -228,22 +298,22 @@ class GameState:
     def get_rook_moves(self, r, c, moves):
         for distance in range(1, r + 1):
             self.move_up(r, c, distance, moves)
-            if self.board[r - distance][c].piece:
+            if self.board.grid[r - distance][c].piece:
                 break
 
         for distance in range(1, 8 - r):
             self.move_down(r, c, distance, moves)
-            if self.board[r + distance][c].piece:
+            if self.board.grid[r + distance][c].piece:
                 break
 
         for distance in range(1, c + 1):
             self.move_left(r, c, distance, moves)
-            if self.board[r][c - distance].piece:
+            if self.board.grid[r][c - distance].piece:
                 break
 
         for distance in range(1, 8 - c):
             self.move_right(r, c, distance, moves)
-            if self.board[r][c + distance].piece:
+            if self.board.grid[r][c + distance].piece:
                 break
 
     def get_bishop_moves(self, r, c, moves):
@@ -252,7 +322,7 @@ class GameState:
                 break
             else:
                 self.move_up_left(r, c, distance, moves)
-                if self.board[r - distance][c - distance].piece:
+                if self.board.grid[r - distance][c - distance].piece:
                     break
 
         for distance in range(1, 8):  # up and right
@@ -260,7 +330,7 @@ class GameState:
                 break
             else:
                 self.move_up_right(r, c, distance, moves)
-                if self.board[r - distance][c + distance].piece:
+                if self.board.grid[r - distance][c + distance].piece:
                     break
 
         for distance in range(1, 8):  # down and right
@@ -268,7 +338,7 @@ class GameState:
                 break
             else:
                 self.move_down_right(r, c, distance, moves)
-                if self.board[r + distance][c + distance].piece:
+                if self.board.grid[r + distance][c + distance].piece:
                     break
 
         for distance in range(1, 8):  # down and left
@@ -276,7 +346,7 @@ class GameState:
                 break
             else:
                 self.move_down_left(r, c, distance, moves)
-                if self.board[r + distance][c - distance].piece:
+                if self.board.grid[r + distance][c - distance].piece:
                     break
 
     def get_knight_moves(self, r, c, moves):
@@ -286,97 +356,97 @@ class GameState:
             if r + val2 in range(8):
                 for val1 in values1:
                     if c + val1 in range(8):
-                        if self.board[r + val2][c + val1].piece is None:
+                        if self.board.grid[r + val2][c + val1].piece is None:
                             moves.append(Move((r, c), (r + val2, c + val1), self.board))
-                        elif self.board[r + val2][c + val1].piece.color != self.board[r][c].piece.color:
+                        elif self.board.grid[r + val2][c + val1].piece.color != self.board.grid[r][c].piece.color:
                             moves.append(Move((r, c), (r + val2, c + val1), self.board))
 
         for val1 in values1:
             if r + val1 in range(8):
                 for val2 in values2:
                     if c + val2 in range(8):
-                        if self.board[r + val1][c + val2].piece is None:
+                        if self.board.grid[r + val1][c + val2].piece is None:
                             moves.append(Move((r, c), (r + val1, c + val2), self.board))
-                        elif self.board[r + val1][c + val2].piece.color != self.board[r][c].piece.color:
+                        elif self.board.grid[r + val1][c + val2].piece.color != self.board.grid[r][c].piece.color:
                             moves.append(Move((r, c), (r + val1, c + val2), self.board))
 
     def get_pawn_moves(self, r, c, moves):
-        if self.board[r][c].piece.color == Color.White:
-            if self.board[r - 1][c].piece is None:  # Up 1
+        if self.board.grid[r][c].piece.color == Color.White:
+            if self.board.grid[r - 1][c].piece is None:  # Up 1
                 moves.append(Move((r, c), (r - 1, c), self.board))
-                if r == 6 and self.board[r - 2][c].piece is None:  # Up 2
+                if r == 6 and self.board.grid[r - 2][c].piece is None:  # Up 2
                     moves.append(Move((r, c), (r - 2, c), self.board))
             if c - 1 >= 0:  # Capture Left
-                if self.board[r - 1][c - 1].piece and self.board[r - 1][c - 1].piece.color == Color.Black:
+                if self.board.grid[r - 1][c - 1].piece and self.board.grid[r - 1][c - 1].piece.color == Color.Black:
                     moves.append(Move((r, c), (r - 1, c - 1), self.board))
             if c + 1 <= 7:  # Capture Right
-                if self.board[r - 1][c + 1].piece and self.board[r - 1][c + 1].piece.color == Color.Black:
+                if self.board.grid[r - 1][c + 1].piece and self.board.grid[r - 1][c + 1].piece.color == Color.Black:
                     moves.append(Move((r, c), (r - 1, c + 1), self.board))
 
-        if self.board[r][c].piece.color == Color.Black:
-            if self.board[r + 1][c].piece is None:  # Down 1
+        if self.board.grid[r][c].piece.color == Color.Black:
+            if self.board.grid[r + 1][c].piece is None:  # Down 1
                 moves.append(Move((r, c), (r + 1, c), self.board))
-                if r == 1 and self.board[r + 2][c].piece is None:  # Down 2
+                if r == 1 and self.board.grid[r + 2][c].piece is None:  # Down 2
                     moves.append(Move((r, c), (r + 2, c), self.board))
             if c - 1 >= 0:  # Capture Down Right
-                if self.board[r + 1][c - 1].piece and self.board[r + 1][c - 1].piece.color == Color.White:
+                if self.board.grid[r + 1][c - 1].piece and self.board.grid[r + 1][c - 1].piece.color == Color.White:
                     moves.append(Move((r, c), (r + 1, c - 1), self.board))
             if c + 1 <= 7:  # Capture Down Left
-                if self.board[r + 1][c + 1].piece and self.board[r + 1][c + 1].piece.color == Color.White:
+                if self.board.grid[r + 1][c + 1].piece and self.board.grid[r + 1][c + 1].piece.color == Color.White:
                     moves.append(Move((r, c), (r + 1, c + 1), self.board))
 
     def move_up_left(self, r, c, distance, moves):
         if r - distance >= 0 and c - distance >= 0:
-            if self.board[r - distance][c - distance].piece is None:
+            if self.board.grid[r - distance][c - distance].piece is None:
                 moves.append(Move((r, c), (r - distance, c - distance), self.board))
-            elif self.board[r - distance][c - distance].piece.color != self.board[r][c].piece.color:
+            elif self.board.grid[r - distance][c - distance].piece.color != self.board.grid[r][c].piece.color:
                 moves.append(Move((r, c), (r - distance, c - distance), self.board))
 
     def move_up_right(self, r, c, distance, moves):
         if r - distance >= 0 and c + distance <= 7:
-            if self.board[r - distance][c + distance].piece is None:
+            if self.board.grid[r - distance][c + distance].piece is None:
                 moves.append(Move((r, c), (r - distance, c + distance), self.board))
-            elif self.board[r - distance][c + distance].piece.color != self.board[r][c].piece.color:
+            elif self.board.grid[r - distance][c + distance].piece.color != self.board.grid[r][c].piece.color:
                 moves.append(Move((r, c), (r - distance, c + distance), self.board))
 
     def move_down_right(self, r, c, distance, moves):
         if r + distance <= 7 and c + distance <= 7:
-            if self.board[r + distance][c + distance].piece is None:
+            if self.board.grid[r + distance][c + distance].piece is None:
                 moves.append(Move((r, c), (r + distance, c + distance), self.board))
-            elif self.board[r + distance][c + distance].piece.color != self.board[r][c].piece.color:
+            elif self.board.grid[r + distance][c + distance].piece.color != self.board.grid[r][c].piece.color:
                 moves.append(Move((r, c), (r + distance, c + distance), self.board))
 
     def move_down_left(self, r, c, distance, moves):
         if r + distance <= 7 and c - distance >= 0:
-            if self.board[r + distance][c - distance].piece is None:
+            if self.board.grid[r + distance][c - distance].piece is None:
                 moves.append(Move((r, c), (r + distance, c - distance), self.board))
-            elif self.board[r + distance][c - distance].piece.color != self.board[r][c].piece.color:
+            elif self.board.grid[r + distance][c - distance].piece.color != self.board.grid[r][c].piece.color:
                 moves.append(Move((r, c), (r + distance, c - distance), self.board))
 
     def move_up(self, r, c, distance, moves):
         if r - distance >= 0:
-            if self.board[r - distance][c].piece is None:
+            if self.board.grid[r - distance][c].piece is None:
                 moves.append(Move((r, c), (r - distance, c), self.board))
-            elif self.board[r - distance][c].piece.color != self.board[r][c].piece.color:
+            elif self.board.grid[r - distance][c].piece.color != self.board.grid[r][c].piece.color:
                 moves.append(Move((r, c), (r - distance, c), self.board))
 
     def move_down(self, r, c, distance, moves):
         if r + distance <= 7:
-            if self.board[r + distance][c].piece is None:
+            if self.board.grid[r + distance][c].piece is None:
                 moves.append(Move((r, c), (r + distance, c), self.board))
-            elif self.board[r + distance][c].piece.color != self.board[r][c].piece.color:
+            elif self.board.grid[r + distance][c].piece.color != self.board.grid[r][c].piece.color:
                 moves.append(Move((r, c), (r + distance, c), self.board))
 
     def move_left(self, r, c, distance, moves):
         if c - distance >= 0:
-            if self.board[r][c - distance].piece is None:
+            if self.board.grid[r][c - distance].piece is None:
                 moves.append(Move((r, c), (r, c - distance), self.board))
-            elif self.board[r][c - distance].piece.color != self.board[r][c].piece.color:
+            elif self.board.grid[r][c - distance].piece.color != self.board.grid[r][c].piece.color:
                 moves.append(Move((r, c), (r, c - distance), self.board))
 
     def move_right(self, r, c, distance, moves):
         if c + distance <= 7:
-            if self.board[r][c + distance].piece is None:
+            if self.board.grid[r][c + distance].piece is None:
                 moves.append(Move((r, c), (r, c + distance), self.board))
-            elif self.board[r][c + distance].piece.color != self.board[r][c].piece.color:
+            elif self.board.grid[r][c + distance].piece.color != self.board.grid[r][c].piece.color:
                 moves.append(Move((r, c), (r, c + distance), self.board))
