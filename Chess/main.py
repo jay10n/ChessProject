@@ -71,27 +71,6 @@ def main():
                             the_move = valid_moves[valid_moves.index(move)]
                             gs.make_move(the_move)
                             move_made = True
-                            '''
-                            match the_move:
-                                case Classes.Castle():
-                                    print("one")
-                                    if not gs.can_castle(gs.player_waiting, the_move):
-                                        print("You can not castle through check! Try again!\a\n")
-                                        gs.undo_move()
-                                        move_made = False
-                                        #selected_square = ()
-                                        #selected_squares = []
-                                        break
-                                case Classes.Move():
-                                    print("two")
-                                    if gs.is_in_check(gs.player_moving, gs.player_waiting):
-                                        print("You can not move into check! Try again, stupid!\a\n")
-                                        gs.undo_move()
-                                        move_made = False
-                                        #selected_square = ()
-                                        #selected_squares = []
-                                        break
-                            '''
                             selected_square = ()
                             selected_squares = []
                             if move_made:

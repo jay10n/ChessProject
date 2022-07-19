@@ -34,7 +34,8 @@ class Player:
 
 
 class Piece:
-    def __init__(self, color):
+    def __init__(self, color, square):
+        self.square = square
         self.has_moved = False
         self.color = color
         if self.color == Color.White:
@@ -44,43 +45,43 @@ class Piece:
 
 
 class Pawn(Piece):
-    def __init__(self, color):
-        super().__init__(color)
+    def __init__(self, color, square):
+        super().__init__(color, square)
         self.materialValue = 1
         self.nameAbv = self.nameAbv + "p"
 
 
 class King(Piece):
-    def __init__(self, color):
-        super().__init__(color)
+    def __init__(self, color, square):
+        super().__init__(color, square)
         self.materialValue = 0
         self.nameAbv = self.nameAbv + "K"
 
 
 class Queen(Piece):
-    def __init__(self, color):
-        super().__init__(color)
+    def __init__(self, color, square):
+        super().__init__(color, square)
         self.materialValue = 9
         self.nameAbv = self.nameAbv + "Q"
 
 
 class Rook(Piece):
-    def __init__(self, color):
-        super().__init__(color)
+    def __init__(self, color, square):
+        super().__init__(color, square)
         self.materialValue = 5
         self.nameAbv = self.nameAbv + "R"
 
 
 class Bishop(Piece):
-    def __init__(self, color):
-        super().__init__(color)
+    def __init__(self, color, square):
+        super().__init__(color, square)
         self.materialValue = 3
         self.nameAbv = self.nameAbv + "B"
 
 
 class Knight(Piece):
-    def __init__(self, color):
-        super().__init__(color)
+    def __init__(self, color, square):
+        super().__init__(color, square)
         self.materialValue = 3
         self.nameAbv = self.nameAbv + "N"
 
@@ -125,7 +126,7 @@ class Castle(Move):
 class EnPassant(Move):
     def __init__(self, start_coords, end_coords, board):
         super().__init__(start_coords, end_coords, board)
-        self.pieceCaptured = board.grid[self.endRow +1][self.endColumn]
+        self.pieceCaptured = board.grid[self.endRow + 1][self.endColumn]
 
 
 class Board:
@@ -144,17 +145,17 @@ class Board:
                     case 0 | 7:
                         match column:
                             case 0 | 7:
-                                temp_piece = Rook(temp_color)
+                                temp_piece = Rook(temp_color, temp_square)
                             case 1 | 6:
-                                temp_piece = Knight(temp_color)
+                                temp_piece = Knight(temp_color, temp_square)
                             case 2 | 5:
-                                temp_piece = Bishop(temp_color)
+                                temp_piece = Bishop(temp_color, temp_square)
                             case 3:
-                                temp_piece = Queen(temp_color)
+                                temp_piece = Queen(temp_color, temp_square)
                             case 4:
-                                temp_piece = King(temp_color)
+                                temp_piece = King(temp_color, temp_square)
                     case 1 | 6:
-                        temp_piece = Pawn(temp_color)
+                        temp_piece = Pawn(temp_color, temp_square)
 
                 self.grid[row][column].piece = temp_piece
 
@@ -198,6 +199,7 @@ class GameState:
             case Castle():
                 self.make_move(move.rook_move)
         self.board.grid[move.endRow][move.endColumn].piece = move.pieceMoved
+        move.pieceMoved.square = self.board.grid[move.endRow][move.endColumn]
         self.board.grid[move.startRow][move.startColumn].piece = None
         self.moveLog.append(move)
 
@@ -205,10 +207,12 @@ class GameState:
         if len(self.moveLog) != 0:
             move = self.moveLog.pop()
             self.board.grid[move.startRow][move.startColumn].piece = move.pieceMoved
+            move.pieceMoved.square = self.board.grid[move.startRow][move.startColumn]
             self.board.grid[move.endRow][move.endColumn].piece = move.pieceCaptured
             match move:
                 case Castle():
                     self.board.grid[move.rook_move.startRow][move.rook_move.startColumn].piece = move.rook
+                    move.rook.square = self.board.grid[move.rook_move.startRow][move.rook_move.startColumn]
                     self.board.grid[move.rook_move.endRow][
                         move.rook_move.endColumn].piece = move.rook_move.pieceCaptured
                     move.rook.has_moved = False
@@ -241,21 +245,22 @@ class GameState:
     def promote_pawn(self, player, move, is_ai):
         new_piece = None
         user_selection = ' '
+        promotion_square = self.board.grid[move.endRow][move.endColumn]
         if is_ai:
             user_selection = 'q'
         while new_piece is None:
             match user_selection:
                 case 'q':
-                    new_piece = Queen(self.player_moving.color)
+                    new_piece = Queen(self.player_moving.color, promotion_square)
                 case 'r':
-                    new_piece = Rook(self.player_moving.color)
+                    new_piece = Rook(self.player_moving.color, promotion_square)
                 case 'b':
-                    new_piece = Bishop(self.player_moving.color)
+                    new_piece = Bishop(self.player_moving.color, promotion_square)
                 case 'n':
-                    new_piece = Knight(self.player_moving.color)
+                    new_piece = Knight(self.player_moving.color, promotion_square)
                 case _:
                     user_selection = input("What would you like to promote to? (q, r, b, n) ")
-        self.board.grid[move.endRow][move.endColumn].piece = new_piece
+        promotion_square.piece = new_piece
         player.piece_list.append(new_piece)
 
     def get_valid_moves(self, player, opponent):
@@ -274,9 +279,6 @@ class GameState:
         for move in invalid_moves:
             possible_moves.remove(move)
         return possible_moves
-        # valid_moves = []
-        # possible_moves = self.get_possible_moves(player)
-        # for move in possible_moves:
 
     def get_possible_moves(self, player):
         moves = []
@@ -439,21 +441,6 @@ class GameState:
             if c + 1 <= 7:  # Capture Down Left
                 if self.board.grid[r + 1][c + 1].piece and self.board.grid[r + 1][c + 1].piece.color == Color.White:
                     moves.append(Move((r, c), (r + 1, c + 1), self.board))
-
-    '''
-        if r == 3:
-
-            match c:
-                case 0:
-                    if self.board.grid[2][1].piece:
-                        if self.board.grid[2][1].piece.isinstance(Pawn):
-
-                case 1|2|3|4|5|6:
-                    pass
-                case 7:
-                    pass
-
-    '''
 
     def move_up_left(self, r, c, distance, moves):
         if r - distance >= 0 and c - distance >= 0:
