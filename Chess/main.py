@@ -66,7 +66,7 @@ def main():
                         selected_squares.append(selected_square)
 
                     if len(selected_squares) == 2:
-                        move = Classes.Move(selected_squares[0], selected_squares[1], gs.board)
+                        move = Classes.Move(gs.board.grid[selected_squares[0][0]][selected_squares[0][1]],gs.board.grid[selected_squares[1][0]][selected_squares[1][1]], gs.board)
                         if move in valid_moves:
                             the_move = valid_moves[valid_moves.index(move)]
                             gs.make_move(the_move)
@@ -76,7 +76,7 @@ def main():
                             if move_made:
                                 print(move.get_chess_notation())
                                 move.pieceMoved.has_moved = True
-                                if Classes.can_promote_pawn(move):
+                                if gs.can_promote_pawn(move):
                                     draw_game_state(screen, gs)
                                     clock.tick(MAX_FPS)
                                     p.display.flip()
@@ -92,10 +92,11 @@ def main():
         # Ai Moves
         if not is_human_turn and len(valid_moves) >= 1:
             ai_move = ChessAI.get_random_move(valid_moves)
-            # time.sleep(.05)
+            #time.sleep(.09)
             gs.make_move(ai_move)
             move_made = True
-            if Classes.can_promote_pawn(ai_move):
+            ai_move.pieceMoved.has_moved = True
+            if gs.can_promote_pawn(ai_move):
                 draw_game_state(screen, gs)
                 clock.tick(MAX_FPS)
                 p.display.flip()
