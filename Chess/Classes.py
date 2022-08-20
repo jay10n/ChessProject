@@ -25,7 +25,10 @@ class PieceType(Enum):
 
     @classmethod
     def get_promotable_pieces(cls):
-        return [cls.Queen, cls.Rook, cls.Bishop, cls.Knight]
+        return [cls.Queen,
+                cls.Rook,
+                cls.Bishop,
+                cls.Knight]
 
 
 class Direction(Enum):
@@ -48,12 +51,25 @@ class Direction(Enum):
 
     @classmethod
     def get_knight_directions(cls):
-        return [cls.Knight_Left_Up, cls.Knight_Right_Up, cls.Knight_Left_Down, cls.Knight_Right_Down,
-                cls.Knight_Up_Left, cls.Knight_Up_Right, cls.Knight_Down_Left, cls.Knight_Down_Right]
+        return [cls.Knight_Left_Up,
+                cls.Knight_Right_Up,
+                cls.Knight_Left_Down,
+                cls.Knight_Right_Down,
+                cls.Knight_Up_Left,
+                cls.Knight_Up_Right,
+                cls.Knight_Down_Left,
+                cls.Knight_Down_Right]
 
     @classmethod
     def get_standard_directions(cls):
-        return [cls.Up, cls.Down, cls.Left, cls.Right, cls.Up_Left, cls.Up_Right, cls.Down_Left, cls.Down_Right]
+        return [cls.Up,
+                cls.Down,
+                cls.Left,
+                cls.Right,
+                cls.Up_Left,
+                cls.Up_Right,
+                cls.Down_Left,
+                cls.Down_Right]
 
 
 # dicts
@@ -63,10 +79,19 @@ rowToRank = {v: k for k, v in rankToRow.items()}
 fileToColumn = {"a": 0, "b": 1, "c": 2, "d": 3, "e": 4, "f": 5, "g": 6, "h": 7}
 columnToFile = {v: k for k, v in fileToColumn.items()}
 
-abvToType = {"K": PieceType.King, "Q": PieceType.Queen, "R": PieceType.Rook, "B": PieceType.Bishop,
-             "N": PieceType.Knight, "p": PieceType.Pawn}
+abvToType = {"K": PieceType.King,
+             "Q": PieceType.Queen,
+             "R": PieceType.Rook,
+             "B": PieceType.Bishop,
+             "N": PieceType.Knight,
+             "p": PieceType.Pawn}
 typeToAbv = {v: k for k, v in abvToType.items()}
-typeToValue = {PieceType.King: 0, PieceType.Queen: 9, PieceType.Rook: 5, PieceType.Bishop: 3, PieceType.Knight: 3,
+
+typeToValue = {PieceType.King: 0,
+               PieceType.Queen: 9,
+               PieceType.Rook: 5,
+               PieceType.Bishop: 3,
+               PieceType.Knight: 3,
                PieceType.Pawn: 1}
 
 
@@ -125,7 +150,6 @@ class Move:
         self.end_square = end_square
         self.piece_moved = start_square.piece
         self.pieceCaptured = end_square.piece
-        self.move_type = "move"
 
     def get_chess_notation(self):
         return get_rank_file(self.start_square.row, self.start_square.column) + \
@@ -146,14 +170,12 @@ class Castle(Move):
         super().__init__(start_square, end_square)
         self.rook = rook_start_square.piece
         self.rook_move = Move(rook_start_square, rook_end_square)
-        self.move_type = "castle"
 
 
 class EnPassant(Move):
     def __init__(self, start_square, end_square, piece_captured):
         super().__init__(start_square, end_square)
         self.pieceCaptured = piece_captured
-        self.move_type = "enpassant"
 
 
 def make_board(players):
@@ -258,8 +280,8 @@ class GameState:
             row = square.row + direction.value[0]
             col = square.column + direction.value[1]
             distance = 1
-            fuck = False
-            while row in range(ROW_SIZE) and col in range(COLUMN_SIZE) and not fuck:
+            knight_move = False
+            while row in range(ROW_SIZE) and col in range(COLUMN_SIZE) and not knight_move:
                 temp_piece = self.board[row][col].piece
                 if temp_piece is not None:
                     if temp_piece.color == opponent.color:
@@ -290,7 +312,7 @@ class GameState:
                 col += direction.value[1]
                 distance += 1
                 if distance == 2 and direction in Direction.get_knight_directions():
-                    fuck = True
+                    knight_move = True
         return False
 
     def is_in_check(self, player, opponent):
@@ -322,7 +344,7 @@ class GameState:
         temp_type = None
         promotion_square = move.end_square
         if is_ai:
-            #TODO fix warning
+            # TODO fix warning
             temp_type = PieceType.get_promotable_pieces()[random.randint(4)]
         else:
             user_selection = " "
