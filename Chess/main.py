@@ -18,6 +18,7 @@ MAX_FPS = 15
 IMAGES = {}
 
 # Sets up Interface
+colors = [p.Color("white"), p.Color("grey")]
 selected_coordinate = namedtuple('Coordinate', ['row', 'column'])
 selected_squares = []
 
@@ -47,13 +48,15 @@ def main():
     load_images()
 
     # Set up Game State
-    player_white_is_human = False
-    player_black_is_human = False
+    player_white_is_human = True
+    player_black_is_human = True
     is_running = True
     gs = Classes.GameState()
     valid_moves = gs.get_valid_moves(gs.player_moving, gs.player_waiting)
-    move_made = False  # flag to check valid moves
+    move_made = animate = game_over = checkmate = stalemate = False  # flags
+
     print("\n------ " + gs.player_moving.color.name + "'s Turn! ------\n")
+    square_selected = None
 
     # Run Game
     while is_running:
@@ -62,42 +65,47 @@ def main():
 
         # When the player makes an action with mouse or keyboard
         for e in p.event.get():
-            if is_human_turn and len(valid_moves) >= 1:
+            if is_human_turn:
 
                 # Mouse Handlers
                 if e.type == p.MOUSEBUTTONDOWN:
-                    location = p.mouse.get_pos()  # x,y pos. mouse
-                    selected_column = location[0] // SQ_SIZE  # x pos
-                    selected_row = location[1] // SQ_SIZE  # y pos
+                    if not game_over:
+                        location = p.mouse.get_pos()  # x,y pos. mouse
+                        selected_column = location[0] // SQ_SIZE  # x pos
+                        selected_row = location[1] // SQ_SIZE  # y pos
 
-                    # same square selected twice then reset
-                    if selected_coordinate == (selected_row, selected_column):
-                        clear_selections()
-                    else:  # unique square selected
-                        set_coordinate(selected_row, selected_column)
-                        selected_squares.append(gs.board[selected_coordinate.row][selected_coordinate.column])
-
-                    # Two squares selected
-                    if len(selected_squares) == 2:
-                        move = Classes.Move(selected_squares[0], selected_squares[1])
-                        if move in valid_moves:
-                            the_move = valid_moves[valid_moves.index(move)]  # TODO fix castling error
-                            gs.make_move(the_move)
-                            move_made = True
-
-                            # Handle Move
-                            move.piece_moved.has_moved = True
-                            if gs.can_promote_pawn(move):
-                                draw_game_state(screen, gs)
-                                clock.tick(MAX_FPS)
-                                p.display.flip()
-                                gs.promote_pawn(gs.player_moving, move, False)
-
+                        # same square selected twice then reset
+                        if selected_coordinate == (selected_row, selected_column):
                             clear_selections()
+                        else:  # unique square selected
+                            set_coordinate(selected_row, selected_column)
+                            square_selected = gs.board[selected_coordinate.row][selected_coordinate.column]
+                            selected_squares.append(square_selected)
 
-                        else:
-                            selected_squares.clear()
-                            selected_squares.append(gs.board[selected_coordinate.row][selected_coordinate.column])
+                        # Two squares selected
+                        if len(selected_squares) == 2:
+                            move = Classes.Move(selected_squares[0], selected_squares[1])
+                            if move in valid_moves:
+                                the_move = valid_moves[valid_moves.index(move)]  # TODO fix castling error
+                                gs.make_move(the_move)
+                                animate = True
+                                move_made = True
+
+                                # Handle Move
+                                move.piece_moved.has_moved = True
+                                if gs.can_promote_pawn(move):
+                                    draw_game_state(screen, gs, valid_moves, square_selected)
+                                    clock.tick(MAX_FPS)
+                                    p.display.flip()
+                                    gs.promote_pawn(gs.player_moving, move, False)
+
+                                clear_selections()
+                                square_selected = None
+
+                            else:
+                                selected_squares.clear()
+                                selected_squares.append(gs.board[selected_coordinate.row][selected_coordinate.column])
+
 
                 # Key Handlers
                 elif e.type == p.QUIT:
@@ -106,45 +114,129 @@ def main():
                 elif e.type == p.KEYDOWN:
                     if e.key == p.K_z:
                         gs.undo_move()
+                        animate = False
                         move_made = True
+                    elif e.key == p.K_r:
+                        gs = Classes.GameState()
+                        valid_moves = gs.get_valid_moves(gs.player_moving, gs.player_waiting)
+                        clear_selections()
+                        square_selected = None
+                        move_made = False
+                        animate = False
 
         # Ai Move Handling
-        if not is_human_turn and len(valid_moves) >= 1:
+        if not is_human_turn and not game_over:
             ai_move = ChessAI.get_random_move(valid_moves)
-            #time.sleep(.1)
+            # time.sleep(1)
             gs.make_move(ai_move)
             move_made = True
+            animate = True
             ai_move.piece_moved.has_moved = True
             if gs.can_promote_pawn(ai_move):
-                draw_game_state(screen, gs)
+                draw_game_state(screen, gs, valid_moves, square_selected)
                 clock.tick(MAX_FPS)
                 p.display.flip()
                 gs.promote_pawn(gs.player_moving, ai_move, True)
 
         # handle post move
         if move_made:
+            if animate:
+                animate_move(gs.moveLog[-1], screen, gs.board, clock)
             gs.toggle_turn()
             valid_moves = gs.get_valid_moves(gs.player_moving, gs.player_waiting)
             print("===========================\n")
-            print("------ " + gs.player_moving.color.name + "'s Turn! ------\n")
-            if gs.is_in_check(gs.player_moving, gs.player_waiting):
-                print(gs.player_moving.color.name + " is in Check!")
+            if len(valid_moves) == 0:
+                game_over = True
+            else:
+                print("------ " + gs.player_moving.color.name + "'s Turn! ------\n")
+                if gs.is_in_check(gs.player_moving, gs.player_waiting):
+                    print(gs.player_moving.color.name + " is in Check!")
             move_made = False
 
         # update gui
-        draw_game_state(screen, gs)
-        clock.tick(MAX_FPS)
+        if not checkmate and not stalemate:
+            draw_game_state(screen, gs, valid_moves, square_selected)
+            clock.tick(MAX_FPS)
+            p.display.flip()
+
+            if game_over:
+                if gs.is_in_check(gs.player_moving, gs.player_waiting):
+                    checkmate = True
+                    draw_text(screen, gs.player_waiting.color.name + " wins by Checkmate!")
+                else:
+                    stalemate = True
+                    draw_text(screen, "Stalemate!")
+
+
+def animate_move(move, screen, board, clock):
+    # coordinate = namedtuple('Coordinate', ['row', 'column'])
+    # global colors
+    delta_row = move.end_square.row - move.start_square.row
+    delta_column = move.end_square.column - move.start_square.column
+    frames_per_square = 10
+    frame_count = (abs(delta_row) + abs(delta_column)) * frames_per_square
+    for frame in range(frame_count + 1):
+        row, column = (move.start_square.row + delta_row * frame / frame_count, move.start_square.column + delta_column * frame / frame_count)
+        draw_board(screen)
+        draw_pieces(screen, board)
+
+        # cover end square during animation
+        temp_square = p.Rect(move.end_square.column * SQ_SIZE, move.end_square.row * SQ_SIZE, SQ_SIZE, SQ_SIZE)
+        p.draw.rect(screen, p.Color("white" if move.end_square.color == Classes.Color.White else "grey"), temp_square)
+
+        # draw captured piece
+        if move.pieceCaptured:
+            screen.blit(IMAGES[move.pieceCaptured.nameAbv], temp_square)
+
+        # draw moving piece
+        screen.blit(IMAGES[move.piece_moved.nameAbv], p.Rect(column * SQ_SIZE, row * SQ_SIZE, SQ_SIZE, SQ_SIZE))
         p.display.flip()
+        clock.tick(60)
 
 
-def draw_game_state(screen, gs):
+def highlight_squares(screen, gs, valid_moves, the_square):
+    surface = p.Surface((SQ_SIZE, SQ_SIZE))
+    surface.set_alpha(100)  # transparency 0 -> 255
+    surface.fill(p.Color('red'))
+
+    if gs.is_in_check(gs.player_moving, gs.player_waiting):
+        screen.blit(surface, (gs.player_moving.king.square.column * SQ_SIZE, gs.player_moving.king.square.row * SQ_SIZE))
+
+    if the_square:
+        if the_square.piece:
+            if (gs.player_moving == gs.players.white and the_square.piece.color == Classes.Color.White) or \
+                    (gs.player_moving == gs.players.black and the_square.piece.color == Classes.Color.Black):
+
+                # Highlight selected square
+                surface.fill(p.Color('orange'))
+                screen.blit(surface, (the_square.column * SQ_SIZE, the_square.row * SQ_SIZE))
+
+                # highlight moves
+                for move in valid_moves:
+                    surface.fill(p.Color('yellow'))
+                    if move.start_square == the_square:
+                        if move.end_square.piece:
+                            surface.fill(p.Color('green'))
+                        screen.blit(surface, (move.end_square.column * SQ_SIZE, move.end_square.row * SQ_SIZE))
+
+
+def draw_text(screen, text):
+    font = p.font.SysFont("San Fransisco", 32, True, False)
+    text_object = font.render(text, 0, p.Color('Grey'))
+    text_location = p.Rect(0, 0, WIDTH, HEIGHT).move(WIDTH / 2 - text_object.get_width() / 2, HEIGHT / 2 - text_object.get_height() / 2)
+    screen.blit(text_object, text_location)
+    text_object = font.render(text, 0, p.Color('Black'))
+    screen.blit(text_object, text_location.move(2, 2))
+    p.display.flip()
+
+
+def draw_game_state(screen, gs, valid_moves, the_square):
     draw_board(screen)
+    highlight_squares(screen, gs, valid_moves, the_square)
     draw_pieces(screen, gs.board)
 
 
 def draw_board(screen):
-    colors = [p.Color("white"), p.Color("grey")]
-
     for r in range(DIMENSION):
         for c in range(DIMENSION):
             color = colors[((r + c) % 2)]
@@ -155,8 +247,7 @@ def draw_pieces(screen, board):
     for r in range(DIMENSION):
         for c in range(DIMENSION):
             if board[r][c].piece:
-                screen.blit(IMAGES[board[r][c].piece.nameAbv],
-                            p.Rect(c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE))
+                screen.blit(IMAGES[board[r][c].piece.nameAbv], p.Rect(c * SQ_SIZE, r * SQ_SIZE, SQ_SIZE, SQ_SIZE))
 
 
 if __name__ == "__main__":
