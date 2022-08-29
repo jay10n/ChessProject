@@ -17,7 +17,7 @@ SQ_SIZE = HEIGHT // DIMENSION
 MAX_FPS = 15
 IMAGES = {}
 
-# Sets up Interface
+# Sets up UI
 colors = [p.Color("white"), p.Color("grey")]
 selected_coordinate = namedtuple('Coordinate', ['row', 'column'])
 selected_squares = []
@@ -28,6 +28,7 @@ def set_coordinate(row, column):
     selected_coordinate.column = column
 
 
+# Clears mouse selections
 def clear_selections():
     selected_coordinate(None, None)
     selected_squares.clear()
@@ -49,14 +50,13 @@ def main():
 
     # Set up Game State
     player_white_is_human = True
-    player_black_is_human = True
+    player_black_is_human = False
     is_running = True
     gs = Classes.GameState()
     valid_moves = gs.get_valid_moves(gs.player_moving, gs.player_waiting)
-    move_made = animate = game_over = checkmate = stalemate = False  # flags
-
-    print("\n------ " + gs.player_moving.color.name + "'s Turn! ------\n")
+    move_made = animate = game_over = False  # flags
     square_selected = None
+    print("\n------ " + gs.player_moving.color.name + "'s Turn! ------\n")
 
     # Run Game
     while is_running:
@@ -74,43 +74,34 @@ def main():
                         selected_column = location[0] // SQ_SIZE  # x pos
                         selected_row = location[1] // SQ_SIZE  # y pos
 
-                        # same square selected twice then reset
-                        if selected_coordinate == (selected_row, selected_column):
+                        if selected_coordinate == (selected_row, selected_column):  # same square selected twice
                             clear_selections()
                         else:  # unique square selected
                             set_coordinate(selected_row, selected_column)
                             square_selected = gs.board[selected_coordinate.row][selected_coordinate.column]
                             selected_squares.append(square_selected)
 
-                        # Two squares selected
-                        if len(selected_squares) == 2:
+                        if len(selected_squares) == 2: # Two squares selected
                             move = Classes.Move(selected_squares[0], selected_squares[1])
                             if move in valid_moves:
                                 the_move = valid_moves[valid_moves.index(move)]  # TODO fix castling error
                                 gs.make_move(the_move)
-                                animate = True
-                                move_made = True
-
-                                # Handle Move
+                                animate = move_made = True
                                 move.piece_moved.has_moved = True
-                                if gs.can_promote_pawn(move):
+                                if gs.can_promote_pawn(move): # handles pawn promotion
                                     draw_game_state(screen, gs, valid_moves, square_selected)
                                     clock.tick(MAX_FPS)
                                     p.display.flip()
                                     gs.promote_pawn(gs.player_moving, move, False)
-
                                 clear_selections()
                                 square_selected = None
-
                             else:
                                 selected_squares.clear()
                                 selected_squares.append(gs.board[selected_coordinate.row][selected_coordinate.column])
 
-
                 # Key Handlers
                 elif e.type == p.QUIT:
                     is_running = False
-
                 elif e.type == p.KEYDOWN:
                     if e.key == p.K_z:
                         gs.undo_move()
@@ -121,17 +112,14 @@ def main():
                         valid_moves = gs.get_valid_moves(gs.player_moving, gs.player_waiting)
                         clear_selections()
                         square_selected = None
-                        move_made = False
-                        animate = False
+                        move_made = animate = False
 
         # Ai Move Handling
         if not is_human_turn and not game_over:
             ai_move = ChessAI.get_random_move(valid_moves)
             # time.sleep(1)
             gs.make_move(ai_move)
-            move_made = True
-            animate = True
-            ai_move.piece_moved.has_moved = True
+            move_made = animate = ai_move.piece_moved.has_moved = True
             if gs.can_promote_pawn(ai_move):
                 draw_game_state(screen, gs, valid_moves, square_selected)
                 clock.tick(MAX_FPS)
@@ -154,23 +142,21 @@ def main():
             move_made = False
 
         # update gui
-        if not checkmate and not stalemate:
+        if not gs.checkmate and not gs.stalemate:
             draw_game_state(screen, gs, valid_moves, square_selected)
             clock.tick(MAX_FPS)
             p.display.flip()
 
             if game_over:
                 if gs.is_in_check(gs.player_moving, gs.player_waiting):
-                    checkmate = True
+                    gs.checkmate = True
                     draw_text(screen, gs.player_waiting.color.name + " wins by Checkmate!")
                 else:
-                    stalemate = True
+                    gs.stalemate = True
                     draw_text(screen, "Stalemate!")
 
 
 def animate_move(move, screen, board, clock):
-    # coordinate = namedtuple('Coordinate', ['row', 'column'])
-    # global colors
     delta_row = move.end_square.row - move.start_square.row
     delta_column = move.end_square.column - move.start_square.column
     frames_per_square = 10

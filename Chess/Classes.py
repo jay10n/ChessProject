@@ -50,6 +50,43 @@ class Direction(Enum):
     Knight_Down_Right = (2, 1)
 
     @classmethod
+    def get_piece_directions(cls, piece_type):
+        match piece_type:
+            case PieceType.King | PieceType.Queen:
+                return cls.get_rook_directions() + cls.get_bishop_directions()
+            case PieceType.Rook:
+                return cls.get_rook_directions()
+            case PieceType.Bishop:
+                return cls.get_bishop_directions()
+            case PieceType.Knight:
+                return cls.get_knight_directions()
+            case PieceType.Pawn:
+                return cls.get_bishop_directions()
+
+    '''
+    @classmethod
+    def get_pawn_directions(cls):
+        if piece_color == Color.White:
+            return [cls.Up]
+        else:
+            return [cls.Down]
+            '''
+
+    @classmethod
+    def get_bishop_directions(cls):
+        return [cls.Up_Left,
+                cls.Up_Right,
+                cls.Down_Left,
+                cls.Down_Right]
+
+    @classmethod
+    def get_rook_directions(cls):
+        return [cls.Up,
+                cls.Down,
+                cls.Left,
+                cls.Right]
+
+    @classmethod
     def get_knight_directions(cls):
         return [cls.Knight_Left_Up,
                 cls.Knight_Right_Up,
@@ -60,6 +97,7 @@ class Direction(Enum):
                 cls.Knight_Down_Left,
                 cls.Knight_Down_Right]
 
+    '''
     @classmethod
     def get_standard_directions(cls):
         return [cls.Up,
@@ -70,12 +108,12 @@ class Direction(Enum):
                 cls.Up_Right,
                 cls.Down_Left,
                 cls.Down_Right]
+                '''
 
 
 # dicts
 rankToRow = {"1": 7, "2": 6, "3": 5, "4": 4, "5": 3, "6": 2, "7": 1, "8": 0}
 rowToRank = {v: k for k, v in rankToRow.items()}
-
 fileToColumn = {"a": 0, "b": 1, "c": 2, "d": 3, "e": 4, "f": 5, "g": 6, "h": 7}
 columnToFile = {v: k for k, v in fileToColumn.items()}
 
@@ -95,10 +133,6 @@ typeToValue = {PieceType.King: 0,
                PieceType.Pawn: 1}
 
 
-#
-# @param (row, column)
-# @returns rank + file as string
-#
 def get_rank_file(row, column):
     return columnToFile[column] + rowToRank[row]
 
@@ -124,6 +158,7 @@ class Piece:
         self.color = player.color
         self.type = piece_type
         self.material = typeToValue[piece_type]
+        self.directions = []
         if self.color == Color.White:
             self.nameAbv = "w"
         else:
@@ -138,6 +173,7 @@ class Square:
         self.color = color
         self.piece = piece
 
+    # Sets piece to square and square to piece
     def update_piece(self, piece):
         self.piece = piece
         if self.piece:
@@ -150,6 +186,9 @@ class Move:
         self.end_square = end_square
         self.piece_moved = start_square.piece
         self.pieceCaptured = end_square.piece
+
+    def __init__(self, piece_to_move, direction, distance):
+        pass
 
     def get_chess_notation(self):
         return get_rank_file(self.start_square.row, self.start_square.column) + \
@@ -182,6 +221,7 @@ def make_board(players):
     the_board = [[Square(0, 0, None, None) for _ in range(0, 8)] for _ in range(0, 8)]
     temp_player = players.black  # Used for populating with pieces.
 
+    # populate board with pieces
     for row in range(ROW_SIZE):
         if row == 2:
             temp_player = players.white
@@ -213,6 +253,7 @@ def make_board(players):
                     temp_type = PieceType.Pawn
                     # temp_type = PieceType.Queen
 
+            # if piece creates abd sets to square and player
             if temp_type:
                 temp_piece = Piece(temp_type, temp_player, temp_square)
                 temp_player.piece_list.append(temp_piece)
@@ -228,6 +269,8 @@ def make_board(players):
 class GameState:
     # Create game state, players
     def __init__(self):
+        self.checkmate = False
+        self.stalemate = False
         self.players = namedtuple('Players', ['white', 'black'])
         self.players.white = Player(Color.White)
         self.players.black = Player(Color.Black)
@@ -247,6 +290,7 @@ class GameState:
         elif isinstance(move, EnPassant):
             move.pieceCaptured.square.piece = None
 
+        # updates the moved piece and start square
         move.end_square.update_piece(move.piece_moved)
         move.start_square.update_piece(None)
 
@@ -360,8 +404,6 @@ class GameState:
         promotion_square.piece = new_piece
         player.piece_list.append(new_piece)
 
-        # move.piece_moved = new_piece
-
     def get_valid_moves(self, player, opponent):
         possible_moves = self.add_possible_moves(player)
         invalid_moves = []
@@ -388,24 +430,16 @@ class GameState:
         moves = []
         for piece in player.piece_list:
             match piece.type:
-                case PieceType.King:
-                    self.add_king_moves(piece, moves)
-                case PieceType.Queen:
-                    self.add_queen_moves(piece, moves)
-                case PieceType.Rook:
-                    self.add_rook_moves(piece, moves)
-                case PieceType.Bishop:
-                    self.add_bishop_moves(piece, moves)
-                case PieceType.Knight:
-                    self.add_knight_moves(piece, moves)
                 case PieceType.Pawn:
                     self.add_pawn_moves(piece, moves)
+                case _:
+                    self.add_piece_moves(piece, moves)
+
         return moves
 
     def add_king_moves(self, piece_to_move, moves):
-        for direction in Direction.get_standard_directions():
+        for direction in Direction.get_piece_directions(PieceType.King):
             self.add_move(piece_to_move, direction, 1, moves)
-
         self.add_castle_moves(piece_to_move, moves)
 
     def add_castle_moves(self, piece_to_move, moves):
@@ -431,6 +465,37 @@ class GameState:
                                                 temp_rook.square,
                                                 final_rook_square))
 
+    def add_piece_moves(self, piece, moves):
+        for direction in Direction.get_piece_directions(piece.type):
+            for distance in range(1, 8):
+                if self.potential_move_in_bounds(piece, direction, distance):
+                    potential_square = self.get_potential_square(piece, direction, distance)
+                    if self.potential_move_is_possible(piece, potential_square):
+                        moves.append(Move(piece.square, potential_square))
+                    if potential_square.piece or piece.type in [PieceType.Knight, PieceType.King]:
+                        break
+                else:
+                    break
+
+    def get_potential_square(self, piece, direction, distance):
+        return self.board[piece.square.row + direction.value[0] * distance][piece.square.column + direction.value[1] * distance]
+
+    def potential_move_in_bounds(self, piece, direction, distance):
+        if (piece.square.row + direction.value[0] * distance) in range(ROW_SIZE) and (piece.square.column + direction.value[1] * distance) in range(COLUMN_SIZE):
+            return True
+        else:
+            return False
+
+    def potential_move_is_possible(self, piece, potential_square):
+        if potential_square.piece:
+            if potential_square.piece.color != piece.color:
+                return True
+            else:
+                return False
+        else:
+            return True
+
+    '''
     def add_queen_moves(self, piece, moves):
         self.add_rook_moves(piece, moves)
         self.add_bishop_moves(piece, moves)
@@ -460,6 +525,7 @@ class GameState:
                 break
 
         return moves
+        
 
     def add_bishop_moves(self, piece, moves):
         row = piece.square.row
@@ -468,7 +534,6 @@ class GameState:
             if row - distance < 0 or column - distance < 0:
                 break
             else:
-                # self.move_up_left(r, c, distance, moves)
                 self.add_move(piece, Direction.Up_Left, distance, moves)
                 if self.board[row - distance][column - distance].piece:
                     break
@@ -477,7 +542,6 @@ class GameState:
             if row - distance < 0 or column + distance > 7:
                 break
             else:
-                # self.move_up_right(r, c, distance, moves)
                 self.add_move(piece, Direction.Up_Right, distance, moves)
                 if self.board[row - distance][column + distance].piece:
                     break
@@ -486,7 +550,6 @@ class GameState:
             if row + distance > 7 or column + distance > 7:
                 break
             else:
-                # self.move_down_right(r, c, distance, moves)
                 self.add_move(piece, Direction.Down_Right, distance, moves)
                 if self.board[row + distance][column + distance].piece:
                     break
@@ -495,7 +558,6 @@ class GameState:
             if row + distance > 7 or column - distance < 0:
                 break
             else:
-                # self.move_down_left(r, c, distance, moves)
                 self.add_move(piece, Direction.Down_Left, distance, moves)
                 if self.board[row + distance][column - distance].piece:
                     break
@@ -504,10 +566,10 @@ class GameState:
 
     def add_knight_moves(self, knight, moves):
         for direction in Direction.get_knight_directions():
-            row = knight.square.row
-            column = knight.square.column
-            row += direction.value[0]
-            column += direction.value[1]
+            row = knight.square.row + direction.value[0]
+            column = knight.square.column + direction.value[1]
+            # row += direction.value[0]
+            # column += direction.value[1]
             if row in range(ROW_SIZE) and column in range(COLUMN_SIZE):
                 temp_square = self.board[row][column]
                 temp_piece = temp_square.piece
@@ -515,28 +577,8 @@ class GameState:
                     moves.append(Move(knight.square, temp_square))
                 elif temp_piece.color.name != knight.color.name:
                     moves.append(Move(knight.square, temp_square))
-
-    '''
-    def enpassant_left(self, pawn, opponent_pawn, moves):
-        left_piece = self.board[pawn.square.row][pawn.square.column - 1].piece
-        if left_piece == opponent_pawn:
-            if pawn.color == Color.White:
-                moves.append(
-                    EnPassant(pawn.square, self.board[pawn.square.row - 1][pawn.square.column - 1], opponent_pawn))
-            else:
-                moves.append(
-                    EnPassant(pawn.square, self.board[pawn.square.row + 1][pawn.square.column - 1], opponent_pawn))
-
-    def enpassant_right(self, pawn, opponent_pawn, moves):
-        right_piece = self.board[pawn.square.row][pawn.square.column + 1].piece
-        if right_piece == opponent_pawn:
-            if pawn.color == Color.White:
-                moves.append(
-                    EnPassant(pawn.square, self.board[pawn.square.row - 1][pawn.square.column + 1], opponent_pawn))
-            else:
-                moves.append(
-                    EnPassant(pawn.square, self.board[pawn.square.row + 1][pawn.square.column + 1], opponent_pawn))
-    '''
+                    
+                    '''
 
     def add_ep(self, pawn, opponent_pawn, left_right, moves):
         # left = -1 right = 1
@@ -559,14 +601,10 @@ class GameState:
             if previous_move.piece_moved.type == PieceType.Pawn:
                 if abs(previous_move.start_square.row - previous_move.end_square.row) == 2:
                     if pawn.square.column == 0:
-                        # self.enpassant_right(pawn, previous_move.piece_moved, moves)
                         self.add_ep(pawn, previous_move.piece_moved, right, moves)
                     elif pawn.square.column == 7:
-                        # self.enpassant_left(pawn, previous_move.piece_moved, moves)
                         self.add_ep(pawn, previous_move.piece_moved, left, moves)
                     else:
-                        # self.enpassant_left(pawn, previous_move.piece_moved, moves)
-                        # self.enpassant_right(pawn, previous_move.piece_moved, moves)
                         self.add_ep(pawn, previous_move.piece_moved, right, moves)
                         self.add_ep(pawn, previous_move.piece_moved, left, moves)
 
