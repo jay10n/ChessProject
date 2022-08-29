@@ -20,7 +20,10 @@ IMAGES = {}
 # Sets up UI
 colors = [p.Color("white"), p.Color("grey")]
 selected_coordinate = namedtuple('Coordinate', ['row', 'column'])
-selected_squares = []
+selected_squares = namedtuple('square_selection', ['start_square', 'end_square'])
+
+
+# selected_squares = []
 
 
 def set_coordinate(row, column):
@@ -31,7 +34,7 @@ def set_coordinate(row, column):
 # Clears mouse selections
 def clear_selections():
     selected_coordinate(None, None)
-    selected_squares.clear()
+    selected_squares(None, None)
 
 
 def load_images():
@@ -50,7 +53,7 @@ def main():
 
     # Set up Game State
     player_white_is_human = True
-    player_black_is_human = False
+    player_black_is_human = True
     is_running = True
     gs = Classes.GameState()
     valid_moves = gs.get_valid_moves(gs.player_moving, gs.player_waiting)
@@ -79,25 +82,37 @@ def main():
                         else:  # unique square selected
                             set_coordinate(selected_row, selected_column)
                             square_selected = gs.board[selected_coordinate.row][selected_coordinate.column]
-                            selected_squares.append(square_selected)
+                            if selected_squares.start_square is None:
+                                selected_squares.start_square = square_selected
+                            else:
+                                selected_squares.end_square = square_selected
 
-                        if len(selected_squares) == 2: # Two squares selected
+                        if selected_squares.start_square and selected_squares.end_square:  # Two squares selected
+                            '''
                             move = Classes.Move(selected_squares[0], selected_squares[1])
                             if move in valid_moves:
                                 the_move = valid_moves[valid_moves.index(move)]  # TODO fix castling error
+                                '''
+                            the_move = None
+                            for move in valid_moves:
+                                if move == selected_squares:
+                                    the_move = move
+                                    break
+
+                            if the_move:
                                 gs.make_move(the_move)
                                 animate = move_made = True
-                                move.piece_moved.has_moved = True
-                                if gs.can_promote_pawn(move): # handles pawn promotion
+                                the_move.piece_moving.has_moved = True
+                                if gs.can_promote_pawn(the_move):  # handles pawn promotion
                                     draw_game_state(screen, gs, valid_moves, square_selected)
                                     clock.tick(MAX_FPS)
                                     p.display.flip()
-                                    gs.promote_pawn(gs.player_moving, move, False)
+                                    gs.promote_pawn(gs.player_moving, the_move, False)
                                 clear_selections()
                                 square_selected = None
                             else:
-                                selected_squares.clear()
-                                selected_squares.append(gs.board[selected_coordinate.row][selected_coordinate.column])
+                                selected_squares(None, None)
+                                selected_squares.start_square = gs.board[selected_coordinate.row][selected_coordinate.column]
 
                 # Key Handlers
                 elif e.type == p.QUIT:
@@ -119,7 +134,7 @@ def main():
             ai_move = ChessAI.get_random_move(valid_moves)
             # time.sleep(1)
             gs.make_move(ai_move)
-            move_made = animate = ai_move.piece_moved.has_moved = True
+            move_made = animate = ai_move.piece_moving.has_moved = True
             if gs.can_promote_pawn(ai_move):
                 draw_game_state(screen, gs, valid_moves, square_selected)
                 clock.tick(MAX_FPS)
@@ -175,7 +190,7 @@ def animate_move(move, screen, board, clock):
             screen.blit(IMAGES[move.pieceCaptured.nameAbv], temp_square)
 
         # draw moving piece
-        screen.blit(IMAGES[move.piece_moved.nameAbv], p.Rect(column * SQ_SIZE, row * SQ_SIZE, SQ_SIZE, SQ_SIZE))
+        screen.blit(IMAGES[move.piece_moving.nameAbv], p.Rect(column * SQ_SIZE, row * SQ_SIZE, SQ_SIZE, SQ_SIZE))
         p.display.flip()
         clock.tick(60)
 

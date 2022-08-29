@@ -181,27 +181,43 @@ class Square:
 
 
 class Move:
-    def __init__(self, start_square, end_square):
-        self.start_square = start_square
-        self.end_square = end_square
-        self.piece_moved = start_square.piece
-        self.pieceCaptured = end_square.piece
+    def __init__(self, piece_moving, direction, distance, board):
+        self.piece_moving = piece_moving
+        self.direction = direction
+        self.distance = distance
+        self.board = board
+        self.is_possible = False
+        if self.in_bounds():
+            self.start_square = piece_moving.square
+            self.end_square = self.get_end_square()
+            self.is_possible = self.potential_move_is_possible()
+            self.pieceCaptured = self.end_square.piece
 
-    def __init__(self, piece_to_move, direction, distance):
-        pass
+    def get_end_square(self):
+        return self.board[self.piece_moving.square.row + self.direction.value[0] * self.distance][self.piece_moving.square.column + self.direction.value[1] * self.distance]
+
+    def in_bounds(self):
+        if (self.piece_moving.square.row + self.direction.value[0] * self.distance) in range(ROW_SIZE) and \
+                (self.piece_moving.square.column + self.direction.value[1] * self.distance) in range(COLUMN_SIZE):
+            return True
+        else:
+            return False
+
+    def potential_move_is_possible(self):
+        if self.end_square.piece:
+            if self.end_square.piece.color != self.piece_moving.color:
+                return True
+            else:
+                return False
+        else:
+            return True
 
     def get_chess_notation(self):
         return get_rank_file(self.start_square.row, self.start_square.column) + \
                get_rank_file(self.end_square.row, self.end_square.column)
 
     def __eq__(self, other):
-        if isinstance(other, Move):
-            return self.start_square.column == other.start_square.column \
-                   and self.start_square.row == other.start_square.row \
-                   and self.end_square.column == other.end_square.column \
-                   and self.end_square.row == other.end_square.row
-        else:
-            return False
+        return self.start_square == other.start_square and self.end_square == other.end_square
 
 
 class Castle(Move):
@@ -212,9 +228,9 @@ class Castle(Move):
 
 
 class EnPassant(Move):
-    def __init__(self, start_square, end_square, piece_captured):
-        super().__init__(start_square, end_square)
-        self.pieceCaptured = piece_captured
+    def __init__(self, piece_moving, direction, distance, board):
+        super().__init__(piece_moving, direction, distance, board)
+        self.pieceCaptured = self.board[self.start_square.row][self.end_square.column].piece
 
 
 def make_board(players):
@@ -291,7 +307,7 @@ class GameState:
             move.pieceCaptured.square.piece = None
 
         # updates the moved piece and start square
-        move.end_square.update_piece(move.piece_moved)
+        move.end_square.update_piece(move.piece_moving)
         move.start_square.update_piece(None)
 
         if move.pieceCaptured:
@@ -302,13 +318,13 @@ class GameState:
     def undo_move(self):
         if len(self.moveLog) != 0:
             move = self.moveLog.pop()
-            move.start_square.update_piece(move.piece_moved)
+            move.start_square.update_piece(move.piece_moving)
 
             if isinstance(move, Castle):
                 move.rook_move.start_square.update_piece(move.rook)
                 move.rook_move.end_square.update_piece(None)
                 move.rook.has_moved = False
-                move.piece_moved.has_moved = False
+                move.piece_moving.has_moved = False
 
             if isinstance(move, EnPassant):
                 move.pieceCaptured.square.update_piece(move.pieceCaptured)
@@ -378,7 +394,7 @@ class GameState:
 
     @staticmethod
     def can_promote_pawn(move):
-        if move.piece_moved.type == PieceType.Pawn:
+        if move.piece_moving.type == PieceType.Pawn:
             if move.end_square.row == 0 or move.end_square.row == 7:
                 return True
         return False
@@ -397,7 +413,7 @@ class GameState:
                     temp_type = abvToType[user_selection]
                 else:
                     user_selection = input("What would you like to promote to? (Q, R, B, N): ")
-        player.piece_list.remove(move.piece_moved)
+        player.piece_list.remove(move.piece_moving)
         move.end_square.piece = None
         new_piece = Piece(temp_type, player, promotion_square)
         new_piece.has_moved = True
@@ -432,8 +448,26 @@ class GameState:
             match piece.type:
                 case PieceType.Pawn:
                     self.add_pawn_moves(piece, moves)
+                case PieceType.King:
+                    self.add_king_moves(piece, moves)
+                case _:
+                    for direction in Direction.get_piece_directions(piece.type):
+                        for distance in range(1, 8):
+                            potential_move = Move(piece, direction, distance, self.board)
+                            if potential_move.is_possible:
+                                moves.append(potential_move)
+                                if potential_move.pieceCaptured or piece.type in [PieceType.Knight, PieceType.King]:
+                                    break
+                            else:
+                                break
+        '''
+        for piece in player.piece_list:
+            match piece.type:
+                case PieceType.Pawn:
+                    self.add_pawn_moves(piece, moves)
                 case _:
                     self.add_piece_moves(piece, moves)
+                    '''
 
         return moves
 
@@ -464,36 +498,6 @@ class GameState:
                                                 final_king_square,
                                                 temp_rook.square,
                                                 final_rook_square))
-
-    def add_piece_moves(self, piece, moves):
-        for direction in Direction.get_piece_directions(piece.type):
-            for distance in range(1, 8):
-                if self.potential_move_in_bounds(piece, direction, distance):
-                    potential_square = self.get_potential_square(piece, direction, distance)
-                    if self.potential_move_is_possible(piece, potential_square):
-                        moves.append(Move(piece.square, potential_square))
-                    if potential_square.piece or piece.type in [PieceType.Knight, PieceType.King]:
-                        break
-                else:
-                    break
-
-    def get_potential_square(self, piece, direction, distance):
-        return self.board[piece.square.row + direction.value[0] * distance][piece.square.column + direction.value[1] * distance]
-
-    def potential_move_in_bounds(self, piece, direction, distance):
-        if (piece.square.row + direction.value[0] * distance) in range(ROW_SIZE) and (piece.square.column + direction.value[1] * distance) in range(COLUMN_SIZE):
-            return True
-        else:
-            return False
-
-    def potential_move_is_possible(self, piece, potential_square):
-        if potential_square.piece:
-            if potential_square.piece.color != piece.color:
-                return True
-            else:
-                return False
-        else:
-            return True
 
     '''
     def add_queen_moves(self, piece, moves):
@@ -598,15 +602,15 @@ class GameState:
         right = 1
         if (pawn.color == Color.White and pawn.square.row == 3) or (pawn.color == Color.Black and pawn.square.row == 4):
             previous_move = self.moveLog[len(self.moveLog) - 1]
-            if previous_move.piece_moved.type == PieceType.Pawn:
+            if previous_move.piece_moving.type == PieceType.Pawn:
                 if abs(previous_move.start_square.row - previous_move.end_square.row) == 2:
                     if pawn.square.column == 0:
-                        self.add_ep(pawn, previous_move.piece_moved, right, moves)
+                        self.add_ep(pawn, previous_move.piece_moving, right, moves)
                     elif pawn.square.column == 7:
-                        self.add_ep(pawn, previous_move.piece_moved, left, moves)
+                        self.add_ep(pawn, previous_move.piece_moving, left, moves)
                     else:
-                        self.add_ep(pawn, previous_move.piece_moved, right, moves)
-                        self.add_ep(pawn, previous_move.piece_moved, left, moves)
+                        self.add_ep(pawn, previous_move.piece_moving, right, moves)
+                        self.add_ep(pawn, previous_move.piece_moving, left, moves)
 
     def add_pawn_moves(self, pawn, moves):
         row = pawn.square.row
@@ -637,12 +641,16 @@ class GameState:
                 case PieceType.Pawn:
                     if temp_square.piece is None:
                         if direction == Direction.Up or direction == Direction.Down:
-                            moves.append(Move(piece.square, temp_square))
+                            # moves.append(Move(piece.square, temp_square))
+                            moves.append(Move(piece,direction,distance,self.board))
                     elif temp_square.piece.color != piece.color and direction != Direction.Up and \
                             direction != Direction.Down:
-                        moves.append(Move(piece.square, temp_square))
+                        #moves.append(Move(piece.square, temp_square))
+                        moves.append(Move(piece, direction, distance, self.board))
                 case _:
                     if temp_square.piece is None:
-                        moves.append(Move(piece.square, temp_square))
+                        #moves.append(Move(piece.square, temp_square))
+                        moves.append(Move(piece, direction, distance, self.board))
                     elif temp_square.piece.color != piece.color:
-                        moves.append(Move(piece.square, temp_square))
+                        #moves.append(Move(piece.square, temp_square))
+                        moves.append(Move(piece, direction, distance, self.board))
