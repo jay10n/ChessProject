@@ -10,7 +10,6 @@ COLUMN_SIZE = 8
 MAX_DIAGONAL_SIZE = 8
 
 
-
 class Color(Enum):
     White = 0
     Black = 1
@@ -63,7 +62,6 @@ class Direction(Enum):
                 return cls.get_knight_directions()
             case PieceType.Pawn:
                 return cls.get_bishop_directions()
-
 
     @classmethod
     def get_king_castle_directions(cls):
@@ -139,23 +137,102 @@ class Player:
 
 
 class Piece:
-    def __init__(self, piece_type, player, square):
+    def __init__(self, player, square):
         self.square = square
         self.has_moved = False
         self.player = player
         self.color = player.color
-        self.type = piece_type
-        self.material = typeToValue[piece_type]
         self.directions = []
+        self.material_value = None
         if self.color == Color.White:
             self.nameAbv = "w"
         else:
             self.nameAbv = "b"
-        self.nameAbv += typeToAbv[self.type]
+
 
 class Pawn(Piece):
     def __init__(self, player, square):
-        super.__init__()
+        super.__init__(player, square)
+        self.material_value = 1
+        self.nameAbv = self.nameAbv + "p"
+        match self.color:
+            case Color.White:
+                directions = [Direction.Up]
+                sees_directions = [Direction.Up_Left, Direction.Up_Right]
+            case Color.Black:
+                directions = [Direction.Down]
+                sees_directions = [Direction.Down_Left, Direction.Down_Right]
+
+
+class Knight(Piece):
+    def __init__(self, player, square):
+        super.__init__(player, square)
+        self.material_value = 3
+        self.nameAbv = self.nameAbv + "N"
+        directions = [Direction.Knight_Left_Up,
+                      Direction.Knight_Right_Up,
+                      Direction.Knight_Left_Down,
+                      Direction.Knight_Right_Down,
+                      Direction.Knight_Up_Left,
+                      Direction.Knight_Up_Right,
+                      Direction.Knight_Down_Left,
+                      Direction.Knight_Down_Right]
+
+class Bishop(Piece):
+    def __init__(self, player, square):
+        super.__init__(player, square)
+        self.material_value = 3
+        self.nameAbv = self.nameAbv + "B"
+        directions = [Direction.Up_Left,
+                      Direction.Up_Right,
+                      Direction.Down_Left,
+                      Direction.Down_Right]
+
+class Rook(Piece):
+    def __init__(self, player, square):
+        super.__init__(player, square)
+        self.material_value = 5
+        self.nameAbv = self.nameAbv + "R"
+        directions = [Direction.Up,
+                      Direction.Down,
+                      Direction.Left,
+                      Direction.Right]
+
+        castle_directions = [Direction.Right,
+                             Direction.Left]
+
+class Queen(Piece):
+    def __init__(self, player, square):
+        super.__init__(player, square)
+        self.material_value = 9
+        self.nameAbv = self.nameAbv + "Q"
+        directions = [Direction.Up,
+                      Direction.Down,
+                      Direction.Left,
+                      Direction.Right,
+                      Direction.Up_Left,
+                      Direction.Up_Right,
+                      Direction.Down_Left,
+                      Direction.Down_Right]
+
+
+class King(Piece):
+    def __init__(self, player, square):
+        super.__init__(player, square)
+        self.material_value = 0
+        self.nameAbv = self.nameAbv + "K"
+        directions = [Direction.Up,
+                      Direction.Down,
+                      Direction.Left,
+                      Direction.Right,
+                      Direction.Up_Left,
+                      Direction.Up_Right,
+                      Direction.Down_Left,
+                      Direction.Down_Right]
+
+        castle_directions = [Direction.Right,
+                             Direction.Left]
+
 
 
 class Square:
@@ -181,8 +258,6 @@ class Square:
                 if potential_piece:
                     if potential_piece.color == player_waiting.color:
                         if direction in Direction.get_piece_directions(potential_piece):
-
-
 
 
 class Move:
@@ -379,7 +454,6 @@ class GameState:
                 if distance == 2 and direction in Direction.get_knight_directions():
                     knight_move = True
         return False
-
 
     def is_in_check(self, player, opponent):
         return self.square_is_seen(player.king.square, player, opponent)
