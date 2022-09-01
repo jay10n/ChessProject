@@ -10,6 +10,7 @@ COLUMN_SIZE = 8
 MAX_DIAGONAL_SIZE = 8
 
 
+
 class Color(Enum):
     White = 0
     Black = 1
@@ -63,14 +64,14 @@ class Direction(Enum):
             case PieceType.Pawn:
                 return cls.get_bishop_directions()
 
-    '''
+
     @classmethod
-    def get_pawn_directions(cls):
-        if piece_color == Color.White:
-            return [cls.Up]
-        else:
-            return [cls.Down]
-            '''
+    def get_king_castle_directions(cls):
+        return [cls.Right, cls.Left]
+
+    @classmethod
+    def get_rook_castle_directions(cls):
+        return [cls.Left, cls.Right]
 
     @classmethod
     def get_bishop_directions(cls):
@@ -96,19 +97,6 @@ class Direction(Enum):
                 cls.Knight_Up_Right,
                 cls.Knight_Down_Left,
                 cls.Knight_Down_Right]
-
-    '''
-    @classmethod
-    def get_standard_directions(cls):
-        return [cls.Up,
-                cls.Down,
-                cls.Left,
-                cls.Right,
-                cls.Up_Left,
-                cls.Up_Right,
-                cls.Down_Left,
-                cls.Down_Right]
-                '''
 
 
 # dicts
@@ -165,6 +153,10 @@ class Piece:
             self.nameAbv = "b"
         self.nameAbv += typeToAbv[self.type]
 
+class Pawn(Piece):
+    def __init__(self, player, square):
+        super.__init__()
+
 
 class Square:
     def __init__(self, row, column, color, piece):
@@ -178,6 +170,19 @@ class Square:
         self.piece = piece
         if self.piece:
             self.piece.square = self
+
+    def is_seen(self, board, player_moving, player_waiting):
+        coordinate = namedtuple('Coordinate', ['row', 'column'])
+        for direction in Direction:
+            coordinate(self.row + direction.value[0], self.column + direction.value[1])
+            distance = 1
+            while coordinate.row in range(ROW_SIZE) and coordinate.column in range(COLUMN_SIZE) and direction not in Direction.get_knight_directions():
+                potential_piece = board[coordinate.row][coordinate.column].piece
+                if potential_piece:
+                    if potential_piece.color == player_waiting.color:
+                        if direction in Direction.get_piece_directions(potential_piece):
+
+
 
 
 class Move:
@@ -221,10 +226,10 @@ class Move:
 
 
 class Castle(Move):
-    def __init__(self, start_square, end_square, rook_start_square, rook_end_square):
-        super().__init__(start_square, end_square)
-        self.rook = rook_start_square.piece
-        self.rook_move = Move(rook_start_square, rook_end_square)
+    def __init__(self, piece_moving, direction, distance, board, rook, rook_direction, rook_distance):
+        super().__init__(piece_moving, direction, distance, board)
+        self.rook = rook
+        self.rook_move = Move(self.rook, rook_direction, rook_distance, board)
 
 
 class EnPassant(Move):
@@ -375,6 +380,7 @@ class GameState:
                     knight_move = True
         return False
 
+
     def is_in_check(self, player, opponent):
         return self.square_is_seen(player.king.square, player, opponent)
 
@@ -460,15 +466,6 @@ class GameState:
                                     break
                             else:
                                 break
-        '''
-        for piece in player.piece_list:
-            match piece.type:
-                case PieceType.Pawn:
-                    self.add_pawn_moves(piece, moves)
-                case _:
-                    self.add_piece_moves(piece, moves)
-                    '''
-
         return moves
 
     def add_king_moves(self, piece_to_move, moves):
@@ -481,6 +478,7 @@ class GameState:
             king_post_castle_col = [6, 2]
             rook_post_castle_col = [5, 3]
             rook_col = [7, 0]
+            rook_distance = [2, 3]
             castle_ranges = [[5, 7],  # King's side
                              [1, 4]]  # Queen's side
             for kq_side in range(2):
@@ -494,10 +492,9 @@ class GameState:
                         if can_castle:
                             final_king_square = self.board[piece_to_move.square.row][king_post_castle_col[kq_side]]
                             final_rook_square = self.board[temp_rook.square.row][rook_post_castle_col[kq_side]]
-                            moves.append(Castle(piece_to_move.square,
-                                                final_king_square,
-                                                temp_rook.square,
-                                                final_rook_square))
+                            moves.append(
+                                Castle(piece_to_move, Direction.get_king_castle_directions()[kq_side], 2, self.board, temp_rook, Direction.get_rook_castle_directions()[kq_side],
+                                       rook_distance[kq_side]))
 
     '''
     def add_queen_moves(self, piece, moves):
@@ -589,13 +586,19 @@ class GameState:
         adjacent_piece = self.board[pawn.square.row][pawn.square.column + left_right].piece
         if adjacent_piece == opponent_pawn:
             if pawn.color == Color.White:
+                if left_right == -1:
+                    direction = Direction.Up_Left
+                else:
+                    direction = Direction.Up_Right
                 moves.append(
-                    EnPassant(pawn.square, self.board[pawn.square.row - 1][pawn.square.column + left_right],
-                              opponent_pawn))
+                    EnPassant(pawn, direction, 1, self.board))
             else:
+                if left_right == -1:
+                    direction = Direction.Down_Left
+                else:
+                    direction = Direction.Down_Right
                 moves.append(
-                    EnPassant(pawn.square, self.board[pawn.square.row + 1][pawn.square.column + left_right],
-                              opponent_pawn))
+                    EnPassant(pawn, direction, 1, self.board))
 
     def get_enpassant(self, pawn, moves):
         left = -1
@@ -642,15 +645,15 @@ class GameState:
                     if temp_square.piece is None:
                         if direction == Direction.Up or direction == Direction.Down:
                             # moves.append(Move(piece.square, temp_square))
-                            moves.append(Move(piece,direction,distance,self.board))
+                            moves.append(Move(piece, direction, distance, self.board))
                     elif temp_square.piece.color != piece.color and direction != Direction.Up and \
                             direction != Direction.Down:
-                        #moves.append(Move(piece.square, temp_square))
+                        # moves.append(Move(piece.square, temp_square))
                         moves.append(Move(piece, direction, distance, self.board))
                 case _:
                     if temp_square.piece is None:
-                        #moves.append(Move(piece.square, temp_square))
+                        # moves.append(Move(piece.square, temp_square))
                         moves.append(Move(piece, direction, distance, self.board))
                     elif temp_square.piece.color != piece.color:
-                        #moves.append(Move(piece.square, temp_square))
+                        # moves.append(Move(piece.square, temp_square))
                         moves.append(Move(piece, direction, distance, self.board))
