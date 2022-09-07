@@ -50,40 +50,8 @@ class Direction(Enum):
     Knight_Down_Right = (2, 1)
 
     @classmethod
-    def get_piece_directions(cls, piece_type):
-        match piece_type:
-            case PieceType.King | PieceType.Queen:
-                return cls.get_rook_directions() + cls.get_bishop_directions()
-            case PieceType.Rook:
-                return cls.get_rook_directions()
-            case PieceType.Bishop:
-                return cls.get_bishop_directions()
-            case PieceType.Knight:
-                return cls.get_knight_directions()
-            case PieceType.Pawn:
-                return cls.get_bishop_directions()
-
-    @classmethod
-    def get_king_castle_directions(cls):
-        return [cls.Right, cls.Left]
-
-    @classmethod
-    def get_rook_castle_directions(cls):
-        return [cls.Left, cls.Right]
-
-    @classmethod
-    def get_bishop_directions(cls):
-        return [cls.Up_Left,
-                cls.Up_Right,
-                cls.Down_Left,
-                cls.Down_Right]
-
-    @classmethod
-    def get_rook_directions(cls):
-        return [cls.Up,
-                cls.Down,
-                cls.Left,
-                cls.Right]
+    def get_inverse_direction(cls, direction):
+        return Direction((-direction.value[0], -direction.value[1]))
 
     @classmethod
     def get_knight_directions(cls):
@@ -135,6 +103,9 @@ class Player:
             case Color.Black:
                 self.back_row = 0
 
+    def is_in_check(self, board):
+        return self.king.square.is_seen(self, board)
+
 
 class Piece:
     def __init__(self, player, square):
@@ -142,7 +113,9 @@ class Piece:
         self.has_moved = False
         self.player = player
         self.color = player.color
-        self.directions = []
+        self.move_directions = []
+        self.sees_directions = []
+        self.max_move_distance = 8
         self.material_value = None
         if self.color == Color.White:
             self.nameAbv = "w"
@@ -152,87 +125,97 @@ class Piece:
 
 class Pawn(Piece):
     def __init__(self, player, square):
-        super.__init__(player, square)
+        super().__init__(player, square)
         self.material_value = 1
         self.nameAbv = self.nameAbv + "p"
+        self.max_move_distance = 1
         match self.color:
             case Color.White:
-                directions = [Direction.Up]
-                sees_directions = [Direction.Up_Left, Direction.Up_Right]
+                self.sees_directions = [Direction.Up_Left, Direction.Up_Right]
+                self.move_directions = self.sees_directions + [Direction.Up]
+
             case Color.Black:
-                directions = [Direction.Down]
-                sees_directions = [Direction.Down_Left, Direction.Down_Right]
+                self.sees_directions = [Direction.Down_Left, Direction.Down_Right]
+                self.move_directions = self.sees_directions + [Direction.Down]
+
+    def can_promote(self):
+        if self.square.row in [0, 7]:
+            return True
+        else:
+            return False
 
 
 class Knight(Piece):
     def __init__(self, player, square):
-        super.__init__(player, square)
+        super().__init__(player, square)
         self.material_value = 3
         self.nameAbv = self.nameAbv + "N"
-        directions = [Direction.Knight_Left_Up,
-                      Direction.Knight_Right_Up,
-                      Direction.Knight_Left_Down,
-                      Direction.Knight_Right_Down,
-                      Direction.Knight_Up_Left,
-                      Direction.Knight_Up_Right,
-                      Direction.Knight_Down_Left,
-                      Direction.Knight_Down_Right]
+        self.max_move_distance = 1
+        self.move_directions = self.sees_directions = [Direction.Knight_Left_Up,
+                                                       Direction.Knight_Right_Up,
+                                                       Direction.Knight_Left_Down,
+                                                       Direction.Knight_Right_Down,
+                                                       Direction.Knight_Up_Left,
+                                                       Direction.Knight_Up_Right,
+                                                       Direction.Knight_Down_Left,
+                                                       Direction.Knight_Down_Right]
+
 
 class Bishop(Piece):
     def __init__(self, player, square):
-        super.__init__(player, square)
+        super().__init__(player, square)
         self.material_value = 3
         self.nameAbv = self.nameAbv + "B"
-        directions = [Direction.Up_Left,
-                      Direction.Up_Right,
-                      Direction.Down_Left,
-                      Direction.Down_Right]
+        self.move_directions = self.sees_directions = [Direction.Up_Left,
+                                                       Direction.Up_Right,
+                                                       Direction.Down_Left,
+                                                       Direction.Down_Right]
+
 
 class Rook(Piece):
     def __init__(self, player, square):
-        super.__init__(player, square)
+        super().__init__(player, square)
         self.material_value = 5
         self.nameAbv = self.nameAbv + "R"
-        directions = [Direction.Up,
-                      Direction.Down,
-                      Direction.Left,
-                      Direction.Right]
+        self.move_directions = self.sees_directions = [Direction.Up,
+                                                       Direction.Down,
+                                                       Direction.Left,
+                                                       Direction.Right]
+        self.castle_directions = [Direction.Left, Direction.Right]
+        self.castle_move_distance = [2, 3]
 
-        castle_directions = [Direction.Right,
-                             Direction.Left]
 
 class Queen(Piece):
     def __init__(self, player, square):
-        super.__init__(player, square)
+        super().__init__(player, square)
         self.material_value = 9
         self.nameAbv = self.nameAbv + "Q"
-        directions = [Direction.Up,
-                      Direction.Down,
-                      Direction.Left,
-                      Direction.Right,
-                      Direction.Up_Left,
-                      Direction.Up_Right,
-                      Direction.Down_Left,
-                      Direction.Down_Right]
+        self.move_directions = self.sees_directions = [Direction.Up,
+                                                       Direction.Down,
+                                                       Direction.Left,
+                                                       Direction.Right,
+                                                       Direction.Up_Left,
+                                                       Direction.Up_Right,
+                                                       Direction.Down_Left,
+                                                       Direction.Down_Right]
 
 
 class King(Piece):
     def __init__(self, player, square):
-        super.__init__(player, square)
+        super().__init__(player, square)
         self.material_value = 0
         self.nameAbv = self.nameAbv + "K"
-        directions = [Direction.Up,
-                      Direction.Down,
-                      Direction.Left,
-                      Direction.Right,
-                      Direction.Up_Left,
-                      Direction.Up_Right,
-                      Direction.Down_Left,
-                      Direction.Down_Right]
-
-        castle_directions = [Direction.Right,
-                             Direction.Left]
-
+        self.max_move_distance = 1
+        self.move_directions = self.sees_directions = [Direction.Up,
+                                                       Direction.Down,
+                                                       Direction.Left,
+                                                       Direction.Right,
+                                                       Direction.Up_Left,
+                                                       Direction.Up_Right,
+                                                       Direction.Down_Left,
+                                                       Direction.Down_Right]
+        self.castle_directions = [Direction.Right, Direction.Left]
+        self.castle_move_distance = 2
 
 
 class Square:
@@ -248,16 +231,26 @@ class Square:
         if self.piece:
             self.piece.square = self
 
-    def is_seen(self, board, player_moving, player_waiting):
-        coordinate = namedtuple('Coordinate', ['row', 'column'])
+    def is_seen(self, player_moving, board):
         for direction in Direction:
-            coordinate(self.row + direction.value[0], self.column + direction.value[1])
+            row = self.row + direction.value[0]
+            column = self.column + direction.value[1]
             distance = 1
-            while coordinate.row in range(ROW_SIZE) and coordinate.column in range(COLUMN_SIZE) and direction not in Direction.get_knight_directions():
-                potential_piece = board[coordinate.row][coordinate.column].piece
+            while row in range(ROW_SIZE) and column in range(COLUMN_SIZE):
+                potential_piece = board[row][column].piece
                 if potential_piece:
-                    if potential_piece.color == player_waiting.color:
-                        if direction in Direction.get_piece_directions(potential_piece):
+                    if potential_piece.color != player_moving.color and distance <= potential_piece.max_move_distance and \
+                            Direction.get_inverse_direction(direction) in potential_piece.sees_directions:
+                        return True
+                    else:
+                        break
+                else:
+                    if direction in Direction.get_knight_directions():
+                        break
+                    row += direction.value[0]
+                    column += direction.value[1]
+                    distance += 1
+        return False
 
 
 class Move:
@@ -284,6 +277,18 @@ class Move:
             return False
 
     def potential_move_is_possible(self):
+        if isinstance(self.piece_moving, Pawn):
+            if self.direction in [Direction.Up, Direction.Down]:
+                if self.end_square.piece:
+                    return False
+                else:
+                    return True
+            else:
+                if self.end_square.piece:
+                    if self.end_square.piece.color != self.piece_moving.color:
+                        return True
+                    else:
+                        return False
         if self.end_square.piece:
             if self.end_square.piece.color != self.piece_moving.color:
                 return True
@@ -317,43 +322,32 @@ def make_board(players):
     the_board = [[Square(0, 0, None, None) for _ in range(0, 8)] for _ in range(0, 8)]
     temp_player = players.black  # Used for populating with pieces.
 
-    # populate board with pieces
-    for row in range(ROW_SIZE):
+    for row in range(ROW_SIZE):  # populate board with pieces
         if row == 2:
             temp_player = players.white
-
         for column in range(COLUMN_SIZE):
             temp_piece = None
-            temp_type = None
             temp_square = Square(row, column, Color((row + column) % 2), None)
-
             match row:
                 case 0 | 7:
                     match column:
                         case 0 | 7:
-                            temp_type = PieceType.Rook
-                            # temp_type = PieceType.Queen
+                            temp_piece = Rook(temp_player, temp_square)
                         case 1 | 6:
-                            temp_type = PieceType.Knight
-                            # temp_type = PieceType.Queen
-
+                            temp_piece = Knight(temp_player, temp_square)
                         case 2 | 5:
-                            temp_type = PieceType.Bishop
-                            # temp_type = PieceType.Queen
+                            temp_piece = Bishop(temp_player, temp_square)
                         case 3:
-                            temp_type = PieceType.Queen
-                            # temp_type = PieceType.Queen
+                            temp_piece = Queen(temp_player, temp_square)
                         case 4:
-                            temp_type = PieceType.King
+                            temp_piece = King(temp_player, temp_square)
                 case 1 | 6:
-                    temp_type = PieceType.Pawn
-                    # temp_type = PieceType.Queen
+                    temp_piece = Pawn(temp_player, temp_square)
 
             # if piece creates abd sets to square and player
-            if temp_type:
-                temp_piece = Piece(temp_type, temp_player, temp_square)
+            if temp_piece:
                 temp_player.piece_list.append(temp_piece)
-                if temp_type == PieceType.King:
+                if isinstance(temp_piece, King):
                     temp_player.king = temp_piece
 
             temp_square.piece = temp_piece
@@ -415,50 +409,7 @@ class GameState:
             if move.pieceCaptured:
                 self.player_waiting.piece_list.append(move.pieceCaptured)  # adds captured piece back to players list
 
-    def square_is_seen(self, square, player, opponent):
-        for direction in Direction:
-            row = square.row + direction.value[0]
-            col = square.column + direction.value[1]
-            distance = 1
-            knight_move = False
-            while row in range(ROW_SIZE) and col in range(COLUMN_SIZE) and not knight_move:
-                temp_piece = self.board[row][col].piece
-                if temp_piece is not None:
-                    if temp_piece.color == opponent.color:
-                        match direction:
-                            case Direction.Up | Direction.Down | Direction.Left | Direction.Right:
-                                if temp_piece.type == PieceType.King and distance == 1:
-                                    return True
-                                elif temp_piece.type == PieceType.Rook or temp_piece.type == PieceType.Queen:
-                                    return True
-                            case Direction.Up_Left | Direction.Up_Right | Direction.Down_Left | Direction.Down_Right:
-                                if temp_piece.type == PieceType.King and distance == 1:
-                                    return True
-                                elif temp_piece.type == PieceType.Pawn:
-                                    if square.row - row == 1 and player.color == Color.White:
-                                        return True
-                                    if row - square.row == 1 and player.color == Color.Black:
-                                        return True
-                                elif temp_piece.type == PieceType.Queen or temp_piece.type == PieceType.Bishop:
-                                    return True
-                            case _:
-                                if temp_piece.type == PieceType.Knight:
-                                    return True
-                                else:
-                                    break
-
-                    break
-                row += direction.value[0]
-                col += direction.value[1]
-                distance += 1
-                if distance == 2 and direction in Direction.get_knight_directions():
-                    knight_move = True
-        return False
-
-    def is_in_check(self, player, opponent):
-        return self.square_is_seen(player.king.square, player, opponent)
-
-    def is_legal_castle(self, player, opponent, move):
+    def is_legal_castle(self, player, move):
         if player.king.has_moved or move.rook.has_moved:
             return False
         else:
@@ -468,24 +419,25 @@ class GameState:
                 side = [4, 3, 2]  # Queen's Side
 
             for x in range(3):
-                if self.square_is_seen(self.board[player.back_row][side[x]], player, opponent):
+                if self.board[player.back_row][side[x]].is_seen(player, self.board):
                     return False
             return True
 
     @staticmethod
     def can_promote_pawn(move):
-        if move.piece_moving.type == PieceType.Pawn:
+        if isinstance(move.piece_moving, Pawn):
             if move.end_square.row == 0 or move.end_square.row == 7:
                 return True
         return False
 
     @staticmethod
     def promote_pawn(player, move, is_ai):
-        temp_type = None
         promotion_square = move.end_square
+        '''
         if is_ai:
             # TODO fix warning
-            temp_type = PieceType.get_promotable_pieces()[random.randint(4)]
+            # temp_type = PieceType.get_promotable_pieces()[random.randint(4)]
+            temp_piece = Queen(player,promotion_square)
         else:
             user_selection = " "
             while temp_type is None:
@@ -493,14 +445,15 @@ class GameState:
                     temp_type = abvToType[user_selection]
                 else:
                     user_selection = input("What would you like to promote to? (Q, R, B, N): ")
+                    '''
         player.piece_list.remove(move.piece_moving)
         move.end_square.piece = None
-        new_piece = Piece(temp_type, player, promotion_square)
+        new_piece = Queen(player, promotion_square)
         new_piece.has_moved = True
         promotion_square.piece = new_piece
         player.piece_list.append(new_piece)
 
-    def get_valid_moves(self, player, opponent):
+    def get_valid_moves(self, player):
         possible_moves = self.add_possible_moves(player)
         invalid_moves = []
 
@@ -508,13 +461,13 @@ class GameState:
             self.make_move(move)
             match move:
                 case Castle():
-                    if not self.is_legal_castle(player, opponent, move):
+                    if not self.is_legal_castle(player, move):
                         invalid_moves.append(move)
                 case EnPassant():
-                    if self.is_in_check(player, opponent):
+                    if player.is_in_check(self.board):
                         invalid_moves.append(move)
                 case Move():
-                    if self.is_in_check(player, opponent):
+                    if player.is_in_check(self.board):
                         invalid_moves.append(move)
             self.undo_move()
 
@@ -525,34 +478,24 @@ class GameState:
     def add_possible_moves(self, player):
         moves = []
         for piece in player.piece_list:
-            match piece.type:
-                case PieceType.Pawn:
-                    self.add_pawn_moves(piece, moves)
-                case PieceType.King:
-                    self.add_king_moves(piece, moves)
-                case _:
-                    for direction in Direction.get_piece_directions(piece.type):
-                        for distance in range(1, 8):
-                            potential_move = Move(piece, direction, distance, self.board)
-                            if potential_move.is_possible:
-                                moves.append(potential_move)
-                                if potential_move.pieceCaptured or piece.type in [PieceType.Knight, PieceType.King]:
-                                    break
-                            else:
-                                break
+            if isinstance(piece, King):
+                self.add_castle_moves(piece, moves)
+            if isinstance(piece, Pawn):
+                self.add_pawn_moves(piece, moves)
+            for direction in piece.move_directions:
+                for distance in range(1, 8):
+                    potential_move = Move(piece, direction, distance, self.board)
+                    if potential_move.is_possible:
+                        moves.append(potential_move)
+                        if potential_move.pieceCaptured or isinstance(piece, Knight):
+                            break
+                    else:
+                        break
         return moves
-
-    def add_king_moves(self, piece_to_move, moves):
-        for direction in Direction.get_piece_directions(PieceType.King):
-            self.add_move(piece_to_move, direction, 1, moves)
-        self.add_castle_moves(piece_to_move, moves)
 
     def add_castle_moves(self, piece_to_move, moves):
         if not piece_to_move.has_moved:
-            king_post_castle_col = [6, 2]
-            rook_post_castle_col = [5, 3]
             rook_col = [7, 0]
-            rook_distance = [2, 3]
             castle_ranges = [[5, 7],  # King's side
                              [1, 4]]  # Queen's side
             for kq_side in range(2):
@@ -564,96 +507,10 @@ class GameState:
                             if self.board[piece_to_move.square.row][x].piece:
                                 can_castle = False
                         if can_castle:
-                            final_king_square = self.board[piece_to_move.square.row][king_post_castle_col[kq_side]]
-                            final_rook_square = self.board[temp_rook.square.row][rook_post_castle_col[kq_side]]
                             moves.append(
-                                Castle(piece_to_move, Direction.get_king_castle_directions()[kq_side], 2, self.board, temp_rook, Direction.get_rook_castle_directions()[kq_side],
-                                       rook_distance[kq_side]))
-
-    '''
-    def add_queen_moves(self, piece, moves):
-        self.add_rook_moves(piece, moves)
-        self.add_bishop_moves(piece, moves)
-
-    def add_rook_moves(self, piece, moves):
-        row = piece.square.row
-        column = piece.square.column
-
-        for distance in range(1, row + 1):
-            self.add_move(piece, Direction.Up, distance, moves)
-            if self.board[row - distance][column].piece:
-                break
-
-        for distance in range(1, ROW_SIZE - row):
-            self.add_move(piece, Direction.Down, distance, moves)
-            if self.board[row + distance][column].piece:
-                break
-
-        for distance in range(1, column + 1):
-            self.add_move(piece, Direction.Left, distance, moves)
-            if self.board[row][column - distance].piece:
-                break
-
-        for distance in range(1, COLUMN_SIZE - column):
-            self.add_move(piece, Direction.Right, distance, moves)
-            if self.board[row][column + distance].piece:
-                break
-
-        return moves
-        
-
-    def add_bishop_moves(self, piece, moves):
-        row = piece.square.row
-        column = piece.square.column
-        for distance in range(1, MAX_DIAGONAL_SIZE):  # up and left
-            if row - distance < 0 or column - distance < 0:
-                break
-            else:
-                self.add_move(piece, Direction.Up_Left, distance, moves)
-                if self.board[row - distance][column - distance].piece:
-                    break
-
-        for distance in range(1, MAX_DIAGONAL_SIZE):  # up and right
-            if row - distance < 0 or column + distance > 7:
-                break
-            else:
-                self.add_move(piece, Direction.Up_Right, distance, moves)
-                if self.board[row - distance][column + distance].piece:
-                    break
-
-        for distance in range(1, MAX_DIAGONAL_SIZE):  # down and right
-            if row + distance > 7 or column + distance > 7:
-                break
-            else:
-                self.add_move(piece, Direction.Down_Right, distance, moves)
-                if self.board[row + distance][column + distance].piece:
-                    break
-
-        for distance in range(1, MAX_DIAGONAL_SIZE):  # down and left
-            if row + distance > 7 or column - distance < 0:
-                break
-            else:
-                self.add_move(piece, Direction.Down_Left, distance, moves)
-                if self.board[row + distance][column - distance].piece:
-                    break
-
-        return moves
-
-    def add_knight_moves(self, knight, moves):
-        for direction in Direction.get_knight_directions():
-            row = knight.square.row + direction.value[0]
-            column = knight.square.column + direction.value[1]
-            # row += direction.value[0]
-            # column += direction.value[1]
-            if row in range(ROW_SIZE) and column in range(COLUMN_SIZE):
-                temp_square = self.board[row][column]
-                temp_piece = temp_square.piece
-                if temp_piece is None:
-                    moves.append(Move(knight.square, temp_square))
-                elif temp_piece.color.name != knight.color.name:
-                    moves.append(Move(knight.square, temp_square))
-                    
-                    '''
+                                Castle(piece_to_move, piece_to_move.castle_directions[kq_side], piece_to_move.castle_move_distance, self.board, temp_rook,
+                                       temp_rook.castle_directions[kq_side],
+                                       temp_rook.castle_move_distance[kq_side]))
 
     def add_ep(self, pawn, opponent_pawn, left_right, moves):
         # left = -1 right = 1
@@ -679,7 +536,7 @@ class GameState:
         right = 1
         if (pawn.color == Color.White and pawn.square.row == 3) or (pawn.color == Color.Black and pawn.square.row == 4):
             previous_move = self.moveLog[len(self.moveLog) - 1]
-            if previous_move.piece_moving.type == PieceType.Pawn:
+            if isinstance(previous_move.piece_moving, Pawn):
                 if abs(previous_move.start_square.row - previous_move.end_square.row) == 2:
                     if pawn.square.column == 0:
                         self.add_ep(pawn, previous_move.piece_moving, right, moves)
@@ -690,44 +547,15 @@ class GameState:
                         self.add_ep(pawn, previous_move.piece_moving, left, moves)
 
     def add_pawn_moves(self, pawn, moves):
-        row = pawn.square.row
-        column = pawn.square.column
         self.get_enpassant(pawn, moves)
-
-        if row != 7 and row != 0:
-            match pawn.color:
-                case Color.White:
-                    self.add_move(pawn, Direction.Up, 1, moves)
-                    if not pawn.has_moved and self.board[row - 1][column].piece is None:
-                        self.add_move(pawn, Direction.Up, 2, moves)
-                    self.add_move(pawn, Direction.Up_Left, 1, moves)
-                    self.add_move(pawn, Direction.Up_Right, 1, moves)
-                case Color.Black:
-                    self.add_move(pawn, Direction.Down, 1, moves)
-                    if not pawn.has_moved and self.board[row + 1][column].piece is None:
-                        self.add_move(pawn, Direction.Down, 2, moves)
-                    self.add_move(pawn, Direction.Down_Left, 1, moves)
-                    self.add_move(pawn, Direction.Down_Right, 1, moves)
-
-    def add_move(self, piece, direction, distance, moves):
-        row = piece.square.row + (direction.value[0] * distance)
-        column = piece.square.column + (direction.value[1] * distance)
-        if row in range(ROW_SIZE) and column in range(COLUMN_SIZE):
-            temp_square = self.board[row][column]
-            match piece.type:
-                case PieceType.Pawn:
-                    if temp_square.piece is None:
-                        if direction == Direction.Up or direction == Direction.Down:
-                            # moves.append(Move(piece.square, temp_square))
-                            moves.append(Move(piece, direction, distance, self.board))
-                    elif temp_square.piece.color != piece.color and direction != Direction.Up and \
-                            direction != Direction.Down:
-                        # moves.append(Move(piece.square, temp_square))
-                        moves.append(Move(piece, direction, distance, self.board))
-                case _:
-                    if temp_square.piece is None:
-                        # moves.append(Move(piece.square, temp_square))
-                        moves.append(Move(piece, direction, distance, self.board))
-                    elif temp_square.piece.color != piece.color:
-                        # moves.append(Move(piece.square, temp_square))
-                        moves.append(Move(piece, direction, distance, self.board))
+        potential_move = None
+        match pawn.color:
+            case Color.White:
+                if not pawn.has_moved and self.board[pawn.square.row - 1][pawn.square.column].piece is None:
+                    potential_move = Move(pawn, Direction.Up, 2, self.board)
+            case Color.Black:
+                if not pawn.has_moved and self.board[pawn.square.row + 1][pawn.square.column].piece is None:
+                    potential_move = Move(pawn, Direction.Up, 2, self.board)
+        if potential_move:
+            if potential_move.is_possible:
+                moves.append(potential_move)

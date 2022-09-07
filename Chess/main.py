@@ -56,7 +56,7 @@ def main():
     player_black_is_human = True
     is_running = True
     gs = Classes.GameState()
-    valid_moves = gs.get_valid_moves(gs.player_moving, gs.player_waiting)
+    valid_moves = gs.get_valid_moves(gs.player_moving)
     move_made = animate = game_over = False  # flags
     square_selected = None
     print("\n------ " + gs.player_moving.color.name + "'s Turn! ------\n")
@@ -124,7 +124,7 @@ def main():
                         move_made = True
                     elif e.key == p.K_r:
                         gs = Classes.GameState()
-                        valid_moves = gs.get_valid_moves(gs.player_moving, gs.player_waiting)
+                        valid_moves = gs.get_valid_moves(gs.player_moving)
                         clear_selections()
                         square_selected = None
                         move_made = animate = False
@@ -134,7 +134,8 @@ def main():
             ai_move = ChessAI.get_random_move(valid_moves)
             # time.sleep(1)
             gs.make_move(ai_move)
-            move_made = animate = ai_move.piece_moving.has_moved = True
+            # animate = True
+            move_made = ai_move.piece_moving.has_moved = True
             if gs.can_promote_pawn(ai_move):
                 draw_game_state(screen, gs, valid_moves, square_selected)
                 clock.tick(MAX_FPS)
@@ -146,13 +147,13 @@ def main():
             if animate:
                 animate_move(gs.moveLog[-1], screen, gs.board, clock)
             gs.toggle_turn()
-            valid_moves = gs.get_valid_moves(gs.player_moving, gs.player_waiting)
+            valid_moves = gs.get_valid_moves(gs.player_moving)
             print("===========================\n")
             if len(valid_moves) == 0:
                 game_over = True
             else:
                 print("------ " + gs.player_moving.color.name + "'s Turn! ------\n")
-                if gs.is_in_check(gs.player_moving, gs.player_waiting):
+                if gs.player_moving.is_in_check(gs.board):
                     print(gs.player_moving.color.name + " is in Check!")
             move_made = False
 
@@ -163,7 +164,7 @@ def main():
             p.display.flip()
 
             if game_over:
-                if gs.is_in_check(gs.player_moving, gs.player_waiting):
+                if gs.player_moving.is_in_check(gs.board):
                     gs.checkmate = True
                     draw_text(screen, gs.player_waiting.color.name + " wins by Checkmate!")
                 else:
@@ -196,6 +197,8 @@ def animate_move(move, screen, board, clock):
 
 
 def highlight_squares(screen, gs, valid_moves, the_square):
+    pass
+    '''
     surface = p.Surface((SQ_SIZE, SQ_SIZE))
     surface.set_alpha(100)  # transparency 0 -> 255
     surface.fill(p.Color('red'))
@@ -219,6 +222,8 @@ def highlight_squares(screen, gs, valid_moves, the_square):
                         if move.end_square.piece:
                             surface.fill(p.Color('green'))
                         screen.blit(surface, (move.end_square.column * SQ_SIZE, move.end_square.row * SQ_SIZE))
+                        
+                        '''
 
 
 def draw_text(screen, text):
